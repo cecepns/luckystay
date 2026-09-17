@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans antialiased text-gray-800 bg-white;
+  }
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Print styles */
+@media print {
+  body * { visibility: hidden; }
+  #printable-invoice, #printable-invoice * { visibility: visible; }
+  #printable-invoice {
+    position: absolute; left: 0; top: 0; width: 100%;
+    margin: 0; padding: 20px;
+    box-shadow: none !important; border: none !important;
+  }
+  .no-print { display: none !important; }
+}
+
+/* ======================== */
+/* React DatePicker Styling */
+/* ======================== */
+.datepicker-wrapper .react-datepicker-wrapper {
+  width: 100%;
+  display: block;
+}
+
+.datepicker-popper-override {
+  z-index: 50 !important;
+}
+
+.react-datepicker {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  border-radius: 14px !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.03) !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+  padding: 6px !important;
+}
+
+.react-datepicker__triangle { display: none !important; }
+
+.react-datepicker__header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  padding-top: 10px !important;
+  padding-bottom: 8px !important;
+}
+
+.react-datepicker__current-month {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+}
+
+.react-datepicker__day-name {
+  color: #9ca3af !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  width: 34px !important;
+  line-height: 30px !important;
+  margin: 1.5px !important;
+  text-transform: uppercase;
+}
+
+.react-datepicker__day {
+  color: #374151 !important;
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+  width: 34px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  margin: 1.5px !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #fff7ed !important;
+  color: #ea580c !important;
+}
+
+.react-datepicker__day--today {
+  font-weight: 700 !important;
+  color: #f97316 !important;
+  background: #fff7ed !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background: #f97316 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.react-datepicker__day--disabled {
+  color: #e5e7eb !important;
+  pointer-events: none !important;
+}
+
+.react-datepicker__day--outside-month {
+  color: #d1d5db !important;
+}
+
+.react-datepicker__navigation {
+  top: 14px !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #6b7280 !important;
+  border-width: 2px 2px 0 0 !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+  border-color: #f97316 !important;
+}
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 100px;
+  background: #e5e7eb;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #f97316;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #f97316;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+}
