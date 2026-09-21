@@ -121,6 +121,22 @@ async function syncReservationToHostex(booking, property) {
   const hostexPropertyId = property.hostex_property_id || property.id;
   const channelRef = String(booking.invoice_number).replace(/[^a-zA-Z0-9]/g, '');
 
+  const roomRate = Math.round(Number(booking.total_room_price) || (Number(booking.grand_total) - Number(booking.cleaning_fee || 0) - Number(booking.security_deposit || 0)));
+  const cleaningFee = Math.round(Number(booking.cleaning_fee) || 0);
+  const securityDeposit = Math.round(Number(booking.security_deposit) || 0);
+  const grandTotal = Math.round(Number(booking.grand_total) || (roomRate + cleaningFee + securityDeposit));
+  const payoutEarnings = roomRate + cleaningFee;
+
+  const remarksLines = [
+    `Lucky Stay Direct: ${booking.invoice_number}`,
+    `• Sewa Kamar: Rp ${roomRate.toLocaleString('id-ID')}`,
+    cleaningFee > 0 ? `• Cleaning Fee: Rp ${cleaningFee.toLocaleString('id-ID')}` : null,
+    `• Total Payout (Pendapatan): Rp ${payoutEarnings.toLocaleString('id-ID')}`,
+    securityDeposit > 0 ? `• Security Deposit (Jaminan): Rp ${securityDeposit.toLocaleString('id-ID')}` : null,
+    `Total Bayar Tamu: Rp ${grandTotal.toLocaleString('id-ID')}`,
+    securityDeposit > 0 ? `*Perhatian: Deposit Rp ${securityDeposit.toLocaleString('id-ID')} BUKAN pendapatan (titipan jaminan tamu, wajib dikembalikan saat check-out jika unit aman).` : null
+  ].filter(Boolean);
+
   const payload = {
     property_id: Number(hostexPropertyId) || 1,
     check_in_date: typeof booking.check_in_date === 'string' ? booking.check_in_date.slice(0, 10) : new Date(booking.check_in_date).toISOString().slice(0, 10),
@@ -130,10 +146,10 @@ async function syncReservationToHostex(booking, property) {
     mobile: booking.guest_phone || '+628123456789',
     number_of_guests: Number(booking.number_of_guests) || 1,
     currency: 'IDR',
-    rate_amount: Math.round(Number(booking.grand_total)),
+    rate_amount: roomRate,
     commission_amount: 0,
-    received_amount: Math.round(Number(booking.grand_total)),
-    remarks: `Lucky Stay Direct Booking: ${booking.invoice_number}`,
+    received_amount: roomRate,
+    remarks: remarksLines.join('\n'),
     channel_id: channelRef
   };
 
@@ -167,6 +183,37 @@ async function syncReservationToHostex(booking, property) {
     console.log('📡 Calling Hostex POST /reservations:', payload);
     const response = await hostexClient.post('/reservations', payload);
     const hostexCode = response.data?.data?.reservation?.reservation_code || `HTX-${Date.now()}`;
+    const stayCode = response.data?.data?.reservation?.stay_code || hostexCode;
+
+    // Record cleaning fee transaction to Hostex if cleaningFee > 0
+    if (cleaningFee > 0) {
+      try {
+        await hostexClient.post('/transactions', {
+          reservation_code: hostexCode,
+          direction: 'income',
+          amount: cleaningFee,
+          item_id: 13, // 13 is Cleaning fee in Hostex
+          payment_method_id: incomeMethodId,
+          note: `Cleaning Fee - ${booking.invoice_number}`
+        });
+        console.log(`✅ Hostex cleaning fee transaction (Rp ${cleaningFee}) recorded for ${hostexCode}`);
+      } catch (txErr) {
+        console.warn('⚠️ Hostex cleaning fee transaction notice:', txErr.response?.data?.error_msg || txErr.message);
+      }
+    }
+
+    // Attempt setting deposit in check_in_details if securityDeposit > 0
+    if (securityDeposit > 0) {
+      try {
+        await hostexClient.patch(`/reservations/${stayCode}/check_in_details`, {
+          deposit: securityDeposit
+        });
+        console.log(`✅ Hostex check_in_details deposit (Rp ${securityDeposit}) set for ${stayCode}`);
+      } catch (depErr) {
+        // Safe fallback if Hostex account has no external deposit merchant connected
+        console.log('ℹ️ Hostex check_in_details deposit notice:', depErr.response?.data?.error_msg || depErr.message);
+      }
+    }
 
     // Record audit log to MySQL
     try {
@@ -554,7 +601,7 @@ app.get('/api/properties/:id', async (req, res) => {
 });
 
 // POST /api/properties (Create property in MySQL)
-app.post('/api/properties', upload.array('images', 10), async (req, res) => {
+app.post('/api/properties', upload.array('images', 20), async (req, res) => {
   try {
     const {
       name,
@@ -667,7 +714,7 @@ app.post('/api/properties', upload.array('images', 10), async (req, res) => {
 });
 
 // PUT /api/properties/:id (Update property in MySQL)
-app.put('/api/properties/:id', upload.array('images', 10), async (req, res) => {
+app.put('/api/properties/:id', upload.array('images', 20), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existingRows] = await dbPool.query('SELECT * FROM properties WHERE id = ?', [id]);
@@ -758,11 +805,11 @@ app.put('/api/properties/:id', upload.array('images', 10), async (req, res) => {
         targetDiscount || 0,
         body.cleaning_fee !== undefined ? Number(body.cleaning_fee) : current.cleaning_fee,
         body.security_deposit !== undefined ? Number(body.security_deposit) : current.security_deposit,
-        body.max_guests ? Number(body.max_guests) : current.max_guests,
-        body.bedrooms ? Number(body.bedrooms) : current.bedrooms,
-        body.beds ? Number(body.beds) : current.beds,
-        body.bathrooms ? Number(body.bathrooms) : current.bathrooms,
-        body.size_sqm ? Number(body.size_sqm) : current.size_sqm,
+        body.max_guests !== undefined ? Number(body.max_guests) : current.max_guests,
+        body.bedrooms !== undefined ? Number(body.bedrooms) : current.bedrooms,
+        body.beds !== undefined ? Number(body.beds) : current.beds,
+        body.bathrooms !== undefined ? Number(body.bathrooms) : current.bathrooms,
+        body.size_sqm !== undefined ? Number(body.size_sqm) : current.size_sqm,
         body.description !== undefined ? body.description : current.description,
         body.house_rules !== undefined ? body.house_rules : current.house_rules,
         JSON.stringify(parsedAmenities),

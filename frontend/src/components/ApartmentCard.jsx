@@ -100,10 +100,10 @@ export default function ApartmentCard({ property }) {
             <div />
           )}
 
-          {/* Right Pill: Bed Room Type */}
+          {/* Right Pill: Unit Type & Bedroom */}
           <div className="flex items-center gap-1.5 bg-white text-gray-800 text-[11px] font-bold px-3 py-1.5 rounded-full shadow-md border border-gray-100">
             <Bed className="w-3.5 h-3.5 text-red-500" />
-            <span>{property.type === 'Studio' ? 'Studio' : (property.bedrooms || 1)}</span>
+            <span>{property.type ? property.type : `${property.bedrooms || 1} Kamar`}</span>
           </div>
         </div>
       </div>

@@ -166,8 +166,8 @@ export default function AdminPropertiesPage() {
       cleaning_fee: prop.cleaning_fee || '50000',
       security_deposit: prop.security_deposit || '200000',
       max_guests: prop.max_guests || 2,
-      bedrooms: prop.bedrooms || 1,
-      beds: prop.beds || 1,
+      bedrooms: prop.bedrooms ? prop.bedrooms : ((prop.type?.toLowerCase().includes('2') || prop.type?.toLowerCase().includes('two')) ? 2 : 1),
+      beds: prop.beds ? prop.beds : ((prop.type?.toLowerCase().includes('2') || prop.type?.toLowerCase().includes('two')) ? 2 : 1),
       bathrooms: prop.bathrooms || 1,
       size_sqm: prop.size_sqm || 35,
       description: prop.description || '',
@@ -181,12 +181,39 @@ export default function AdminPropertiesPage() {
     setIsModalOpen(true);
   };
 
+  const handleTypeChange = (newType) => {
+    let updatedBedrooms = formData.bedrooms;
+    let updatedBeds = formData.beds;
+    const lower = (newType || '').toLowerCase();
+
+    if (lower.includes('2') || lower.includes('two')) {
+      updatedBedrooms = 2;
+      if (Number(formData.beds) <= 1) updatedBeds = 2;
+    } else if (lower.includes('3') || lower.includes('three')) {
+      updatedBedrooms = 3;
+      if (Number(formData.beds) <= 1) updatedBeds = 3;
+    } else if (lower.includes('4') || lower.includes('four')) {
+      updatedBedrooms = 4;
+      if (Number(formData.beds) <= 1) updatedBeds = 4;
+    } else if (lower.includes('studio') || lower.includes('1') || lower.includes('one')) {
+      updatedBedrooms = 1;
+      if (Number(formData.beds) <= 1) updatedBeds = 1;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      type: newType,
+      bedrooms: updatedBedrooms,
+      beds: updatedBeds
+    }));
+  };
+
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     const totalCount = existingImages.length + newImageFiles.length + files.length;
-    if (totalCount > 10) {
-      toast.error('Maksimal 10 foto per unit apartemen');
+    if (totalCount > 20) {
+      toast.error('Maksimal 20 foto per unit apartemen');
       return;
     }
     const newPreviews = files.map(file => URL.createObjectURL(file));
@@ -586,7 +613,7 @@ export default function AdminPropertiesPage() {
                 <label className="font-bold text-gray-700 block mb-1">Tipe Unit</label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => handleTypeChange(e.target.value)}
                   className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-medium"
                 >
                   {availableTypes.length > 0 ? (
@@ -759,14 +786,71 @@ export default function AdminPropertiesPage() {
                 />
               </div>
 
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">Kapasitas Tamu Maksimal</label>
-                <input
-                  type="number"
-                  value={formData.max_guests}
-                  onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })}
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900"
-                />
+              {/* Unit Specifications & Capacity Grid */}
+              <div className="sm:col-span-2 p-4 bg-gray-50 border border-gray-200 rounded-2xl">
+                <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block mb-3">
+                  Spesifikasi & Kapasitas Unit
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Kamar Tidur</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.bedrooms}
+                      onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-bold focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Tempat Tidur</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.beds}
+                      onChange={(e) => setFormData({ ...formData, beds: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-bold focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Kamar Mandi</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.bathrooms}
+                      onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-bold focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Luas (m²)</label>
+                    <input
+                      type="number"
+                      min="10"
+                      value={formData.size_sqm}
+                      onChange={(e) => setFormData({ ...formData, size_sqm: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-bold focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Maks Tamu</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.max_guests}
+                      onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-bold focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Multi-Image File Upload Zone */}
@@ -776,7 +860,7 @@ export default function AdminPropertiesPage() {
                     Upload Foto Unit Apartemen <span className="text-rose-500">*</span>
                   </label>
                   <span className="text-[11px] text-gray-500 font-medium">
-                    {existingImages.length + newImageFiles.length} / 10 Foto (Maks 10MB/file)
+                    {existingImages.length + newImageFiles.length} / 20 Foto (Maks 10MB/file)
                   </span>
                 </div>
 
