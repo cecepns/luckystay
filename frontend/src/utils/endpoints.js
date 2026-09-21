@@ -26,6 +26,8 @@ export const API_ENDPOINTS = {
     LIST: "/bookings",
     DETAIL: (identifier) => `/bookings/${identifier}`,
     CREATE: "/bookings",
+    UPDATE: (id) => `/bookings/${id}`,
+    DELETE: (id) => `/bookings/${id}`,
     UPLOAD_PROOF: (invoiceNumber) => `/bookings/${invoiceNumber}/payment-proof`,
     APPROVE: (id) => `/bookings/${id}/approve`,
     REJECT: (id) => `/bookings/${id}/reject`,

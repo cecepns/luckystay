@@ -21,7 +21,9 @@ import {
   Filter,
   Image as ImageIcon,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ImageWithFallback from '../../components/ImageWithFallback';
@@ -47,6 +49,24 @@ export default function AdminBookingsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Edit Booking Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    guest_name: '',
+    guest_email: '',
+    guest_phone: '',
+    number_of_guests: 1,
+    check_in_date: '',
+    check_out_date: '',
+    payment_status: 'pending_payment',
+    payment_method: 'bank_transfer',
+    special_requests: '',
+    admin_notes: '',
+    grand_total: ''
+  });
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const fetchBookings = async (page = pagination.page, limit = pagination.limit) => {
     setLoading(true);
@@ -150,6 +170,103 @@ export default function AdminBookingsPage() {
       toast.dismiss(loadingToast);
       toast.error('Gagal menghubungi server Hostex');
     }
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (booking) => {
+    setEditingBooking(booking);
+    setEditFormData({
+      guest_name: booking.guest_name || '',
+      guest_email: booking.guest_email || '',
+      guest_phone: booking.guest_phone || '',
+      number_of_guests: booking.number_of_guests || 1,
+      check_in_date: typeof booking.check_in_date === 'string' ? booking.check_in_date.slice(0, 10) : '',
+      check_out_date: typeof booking.check_out_date === 'string' ? booking.check_out_date.slice(0, 10) : '',
+      payment_status: booking.payment_status || 'pending_payment',
+      payment_method: booking.payment_method || 'bank_transfer',
+      special_requests: booking.special_requests || '',
+      admin_notes: booking.admin_notes || '',
+      grand_total: booking.grand_total || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle Edit Submit
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editFormData.guest_name.trim() || !editFormData.guest_phone.trim()) {
+      toast.error('Nama dan nomor WhatsApp tamu wajib diisi!');
+      return;
+    }
+    if (!editFormData.check_in_date || !editFormData.check_out_date) {
+      toast.error('Tanggal check-in dan check-out wajib diisi!');
+      return;
+    }
+    if (new Date(editFormData.check_out_date) <= new Date(editFormData.check_in_date)) {
+      toast.error('Tanggal check-out harus setelah tanggal check-in!');
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      const res = await request.put(API_ENDPOINTS.BOOKINGS.UPDATE(editingBooking.id), editFormData);
+      if (res.success) {
+        toast.success('Data pemesanan berhasil diperbarui!');
+        setShowEditModal(false);
+        fetchBookings(pagination.page, pagination.limit);
+      } else {
+        toast.error(res.message || 'Gagal memperbarui pemesanan');
+      }
+    } catch (err) {
+      toast.error(err.customMessage || 'Gagal memperbarui pemesanan');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  // Handle Delete Booking with Confirm Toast
+  const handleDeleteBooking = (booking) => {
+    toast((t) => (
+      <div className="flex flex-col gap-2 p-1 text-left">
+        <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+          <span>Hapus Pemesanan #{booking.invoice_number}?</span>
+        </div>
+        <p className="text-xs text-gray-500">
+          Tamu: <span className="font-semibold text-gray-700">{booking.guest_name}</span> ({booking.property_name || 'Properti'}). Data akan dihapus secara permanen.
+        </p>
+        <div className="flex items-center justify-end gap-2 mt-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          >
+            Batal
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const loadingToast = toast.loading('Menghapus pemesanan...');
+              try {
+                const res = await request.delete(API_ENDPOINTS.BOOKINGS.DELETE(booking.id));
+                toast.dismiss(loadingToast);
+                if (res.success) {
+                  toast.success(`Pemesanan ${booking.invoice_number} berhasil dihapus!`);
+                  fetchBookings(pagination.page, pagination.limit);
+                } else {
+                  toast.error(res.message || 'Gagal menghapus');
+                }
+              } catch (err) {
+                toast.dismiss(loadingToast);
+                toast.error(err.customMessage || 'Gagal menghapus pemesanan');
+              }
+            }}
+            className="px-3 py-1 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            Ya, Hapus
+          </button>
+        </div>
+      </div>
+    ), { duration: 6000 });
   };
 
   return (
@@ -348,11 +465,29 @@ export default function AdminBookingsPage() {
                           <Link
                             to={`/invoice/${b.invoice_number}`}
                             target="_blank"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                             title="Cetak Invoice Resmi"
                           >
                             <FileText className="w-4 h-4" />
                           </Link>
+
+                          {/* Edit Booking Button */}
+                          <button
+                            onClick={() => handleOpenEditModal(b)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
+                            title="Edit Data Pemesanan"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
+                          {/* Delete Booking Button */}
+                          <button
+                            onClick={() => handleDeleteBooking(b)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Hapus Pemesanan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
 
                         </div>
                       </td>
@@ -515,6 +650,194 @@ export default function AdminBookingsPage() {
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold"
               >
                 {isProcessing ? 'Menolak...' : 'Konfirmasi Tolak'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* MODAL: EDIT BOOKING */}
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          title={`Edit Pemesanan #${editingBooking?.invoice_number || ''}`}
+          maxWidth="max-w-xl"
+        >
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            {/* Info Tamu */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Nama Tamu <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.guest_name}
+                  onChange={(e) => setEditFormData({ ...editFormData, guest_name: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Nomor Telepon / WA <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.guest_phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, guest_phone: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Email Tamu
+                </label>
+                <input
+                  type="email"
+                  value={editFormData.guest_email}
+                  onChange={(e) => setEditFormData({ ...editFormData, guest_email: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Jumlah Tamu
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={editFormData.number_of_guests}
+                  onChange={(e) => setEditFormData({ ...editFormData, number_of_guests: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                />
+              </div>
+            </div>
+
+            {/* Tanggal Reservasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-orange-50/40 rounded-xl border border-orange-100">
+              <div>
+                <label className="block text-xs font-semibold text-orange-950 uppercase tracking-wider mb-1">
+                  Check-in Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editFormData.check_in_date}
+                  onChange={(e) => setEditFormData({ ...editFormData, check_in_date: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-orange-950 uppercase tracking-wider mb-1">
+                  Check-out Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editFormData.check_out_date}
+                  onChange={(e) => setEditFormData({ ...editFormData, check_out_date: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Status & Metode Pembayaran */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Status Pembayaran
+                </label>
+                <select
+                  value={editFormData.payment_status}
+                  onChange={(e) => setEditFormData({ ...editFormData, payment_status: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                >
+                  <option value="pending_payment">Menunggu Pembayaran</option>
+                  <option value="waiting_approval">Menunggu Verifikasi (Bukti Diunggah)</option>
+                  <option value="confirmed">Dikonfirmasi (Lunas)</option>
+                  <option value="completed">Selesai (Checkout)</option>
+                  <option value="rejected">Ditolak</option>
+                  <option value="cancelled">Dibatalkan</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Metode Pembayaran
+                </label>
+                <select
+                  value={editFormData.payment_method}
+                  onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                >
+                  <option value="bank_transfer">Transfer Bank Manual</option>
+                  <option value="qris">QRIS Digital</option>
+                  <option value="cash">Bayar di Tempat (Cash)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Grand Total */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Total Biaya Pemesanan (Rp)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editFormData.grand_total}
+                onChange={(e) => setEditFormData({ ...editFormData, grand_total: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-mono"
+              />
+            </div>
+
+            {/* Special Request & Admin Notes */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Permintaan Khusus Tamu
+              </label>
+              <textarea
+                rows={2}
+                value={editFormData.special_requests}
+                onChange={(e) => setEditFormData({ ...editFormData, special_requests: e.target.value })}
+                placeholder="Contoh: Late check-in pukul 21:00..."
+                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Catatan Internal Admin
+              </label>
+              <textarea
+                rows={2}
+                value={editFormData.admin_notes}
+                onChange={(e) => setEditFormData({ ...editFormData, admin_notes: e.target.value })}
+                placeholder="Catatan admin (misal: tamu langganan, diskon khusus)..."
+                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingEdit}
+                className="px-5 py-2 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </div>
           </form>

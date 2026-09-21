@@ -1205,6 +1205,122 @@ app.post('/api/bookings/:id/hostex-sync', async (req, res) => {
   }
 });
 
+// PUT /api/bookings/:id (Admin update booking details)
+app.put('/api/bookings/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await dbPool.query('SELECT * FROM bookings WHERE id = ?', [id]);
+
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Data reservasi tidak ditemukan!' });
+    }
+
+    const current = existing[0];
+    const {
+      guest_name,
+      guest_email,
+      guest_phone,
+      number_of_guests,
+      check_in_date,
+      check_out_date,
+      payment_status,
+      payment_method,
+      special_requests,
+      admin_notes,
+      room_price_per_night,
+      total_room_price,
+      cleaning_fee,
+      security_deposit,
+      grand_total
+    } = req.body;
+
+    let updateFields = [];
+    let params = [];
+
+    if (guest_name !== undefined) { updateFields.push('guest_name = ?'); params.push(String(guest_name).trim()); }
+    if (guest_email !== undefined) { updateFields.push('guest_email = ?'); params.push(String(guest_email).trim()); }
+    if (guest_phone !== undefined) { updateFields.push('guest_phone = ?'); params.push(String(guest_phone).trim()); }
+    if (number_of_guests !== undefined) { updateFields.push('number_of_guests = ?'); params.push(Number(number_of_guests) || 1); }
+    
+    // Check if dates changed to recalculate total_nights
+    let checkIn = current.check_in_date;
+    let checkOut = current.check_out_date;
+    if (check_in_date !== undefined) {
+      checkIn = check_in_date;
+      updateFields.push('check_in_date = ?');
+      params.push(check_in_date);
+    }
+    if (check_out_date !== undefined) {
+      checkOut = check_out_date;
+      updateFields.push('check_out_date = ?');
+      params.push(check_out_date);
+    }
+    if (check_in_date !== undefined || check_out_date !== undefined) {
+      const start = new Date(checkIn);
+      const end = new Date(checkOut);
+      const diffDays = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+      updateFields.push('total_nights = ?');
+      params.push(diffDays);
+    }
+
+    if (payment_status !== undefined) { updateFields.push('payment_status = ?'); params.push(payment_status); }
+    if (payment_method !== undefined) { updateFields.push('payment_method = ?'); params.push(payment_method); }
+    if (special_requests !== undefined) { updateFields.push('special_requests = ?'); params.push(special_requests ? String(special_requests).trim() : null); }
+    if (admin_notes !== undefined) { updateFields.push('admin_notes = ?'); params.push(admin_notes ? String(admin_notes).trim() : null); }
+    if (room_price_per_night !== undefined) { updateFields.push('room_price_per_night = ?'); params.push(Number(room_price_per_night) || 0); }
+    if (total_room_price !== undefined) { updateFields.push('total_room_price = ?'); params.push(Number(total_room_price) || 0); }
+    if (cleaning_fee !== undefined) { updateFields.push('cleaning_fee = ?'); params.push(Number(cleaning_fee) || 0); }
+    if (security_deposit !== undefined) { updateFields.push('security_deposit = ?'); params.push(Number(security_deposit) || 0); }
+    if (grand_total !== undefined) { updateFields.push('grand_total = ?'); params.push(Number(grand_total) || 0); }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, message: 'Tidak ada data pemesanan yang diubah.' });
+    }
+
+    params.push(id);
+    await dbPool.query(`UPDATE bookings SET ${updateFields.join(', ')} WHERE id = ?`, params);
+
+    const [updated] = await dbPool.query('SELECT * FROM bookings WHERE id = ?', [id]);
+    res.json({
+      success: true,
+      message: 'Data pemesanan berhasil diperbarui!',
+      data: updated[0]
+    });
+  } catch (err) {
+    console.error('Update booking error:', err);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui data pemesanan', error: err.message });
+  }
+});
+
+// DELETE /api/bookings/:id (Admin delete booking)
+app.delete('/api/bookings/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await dbPool.query('SELECT * FROM bookings WHERE id = ?', [id]);
+
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Data reservasi tidak ditemukan!' });
+    }
+
+    // Clean up associated hostex_logs if any
+    try {
+      await dbPool.query('DELETE FROM hostex_logs WHERE booking_id = ?', [id]);
+    } catch (logErr) {
+      // Non-blocking
+    }
+
+    await dbPool.query('DELETE FROM bookings WHERE id = ?', [id]);
+
+    res.json({
+      success: true,
+      message: 'Data pemesanan berhasil dihapus!'
+    });
+  } catch (err) {
+    console.error('Delete booking error:', err);
+    res.status(500).json({ success: false, message: 'Gagal menghapus pemesanan: ' + err.message });
+  }
+});
+
 // ----------------------------------------------------
 // 3. HOSTEX STATUS & CHANNEL MONITORING APIS
 // ----------------------------------------------------
