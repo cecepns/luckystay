@@ -104,7 +104,8 @@ export default function AdminPaymentMethodsPage() {
   const handleOpenEditModal = (item) => {
     setIsEditMode(true);
     setEditingId(item.id);
-    const isQris = Boolean(item.qris_image || item.bank_name?.toLowerCase().includes('qris'));
+    const validQris = (item.qris_image && item.qris_image !== '[object Object]') ? item.qris_image : null;
+    const isQris = Boolean(validQris || item.bank_name?.toLowerCase().includes('qris'));
     setFormData({
       bank_name: item.bank_name || '',
       account_number: item.account_number || '',
@@ -115,7 +116,7 @@ export default function AdminPaymentMethodsPage() {
     });
     setQrisFile(null);
     setQrisPreview(null);
-    setExistingQrisImage(item.qris_image || null);
+    setExistingQrisImage(validQris);
     setIsModalOpen(true);
   };
 
@@ -125,6 +126,12 @@ export default function AdminPaymentMethodsPage() {
       setQrisFile(file);
       setQrisPreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleClearQris = () => {
+    setQrisFile(null);
+    setQrisPreview(null);
+    setExistingQrisImage(null);
   };
 
   const handleSubmit = async (e) => {
@@ -137,26 +144,28 @@ export default function AdminPaymentMethodsPage() {
     setIsSubmitting(true);
     try {
       const data = new FormData();
-      data.append('bank_name', formData.bank_name);
-      data.append('account_number', formData.account_number);
-      data.append('account_holder', formData.account_holder);
+      data.append('bank_name', formData.bank_name.trim());
+      data.append('account_number', formData.account_number.trim());
+      data.append('account_holder', formData.account_holder.trim());
       data.append('instructions', formData.instructions || '');
       data.append('is_active', formData.is_active);
       data.append('is_qris', formData.is_qris ? '1' : '0');
 
       if (qrisFile) {
         data.append('qris_image', qrisFile);
+      } else if (!formData.is_qris || (!existingQrisImage && isEditMode)) {
+        data.append('remove_qris', 'true');
       }
 
       if (isEditMode) {
-        const res = await request.put(API_ENDPOINTS.PAYMENTS.UPDATE(editingId), data);
+        const res = await request.uploadPut(API_ENDPOINTS.PAYMENTS.UPDATE(editingId), data);
         if (res.success) {
           toast.success('Metode pembayaran berhasil diperbarui!');
           setIsModalOpen(false);
           fetchAccounts();
         }
       } else {
-        const res = await request.post(API_ENDPOINTS.PAYMENTS.CREATE, data);
+        const res = await request.upload(API_ENDPOINTS.PAYMENTS.CREATE, data);
         if (res.success) {
           toast.success('Metode pembayaran berhasil ditambahkan!');
           setIsModalOpen(false);
@@ -287,7 +296,7 @@ export default function AdminPaymentMethodsPage() {
                   </tr>
                 ) : (
                   accounts.map((item) => {
-                    const hasQris = Boolean(item.qris_image);
+                    const hasQris = Boolean(item.qris_image && item.qris_image !== '[object Object]');
                     return (
                       <tr key={item.id} className="hover:bg-orange-50/30 transition-colors">
                         <td className="py-3.5 px-4 font-semibold text-gray-900">
@@ -318,7 +327,7 @@ export default function AdminPaymentMethodsPage() {
                           {item.account_holder}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          {item.qris_image ? (
+                          {hasQris ? (
                             <button
                               type="button"
                               onClick={() => setPreviewQrUrl(item.qris_image)}
@@ -469,7 +478,7 @@ export default function AdminPaymentMethodsPage() {
                     </label>
 
                     {(qrisPreview || existingQrisImage) && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <div className="w-14 h-14 rounded-lg overflow-hidden border border-purple-200 bg-white">
                           <ImageWithFallback
                             src={qrisPreview || existingQrisImage}
@@ -477,7 +486,18 @@ export default function AdminPaymentMethodsPage() {
                             className="w-full h-full object-contain p-0.5"
                           />
                         </div>
-                        <span className="text-[11px] text-gray-500">Preview QR Aktif</span>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-gray-700 font-medium">
+                            {qrisPreview ? 'File gambar baru dipilih' : 'Gambar QR tersimpan'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleClearQris}
+                            className="text-[11px] text-red-600 hover:text-red-700 font-semibold text-left mt-0.5 hover:underline cursor-pointer"
+                          >
+                            Hapus Gambar
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

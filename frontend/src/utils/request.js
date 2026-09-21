@@ -25,22 +25,12 @@ export const request = {
   },
 
   upload: async (url, formData, config = {}) => {
-    const response = await api.post(url, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      ...config,
-    });
+    const response = await api.post(url, formData, config);
     return response.data;
   },
 
   uploadPut: async (url, formData, config = {}) => {
-    const response = await api.put(url, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      ...config,
-    });
+    const response = await api.put(url, formData, config);
     return response.data;
   },
 };

@@ -57,6 +57,7 @@ export default function AdminPropertiesPage() {
   // Dynamic Options for City & Unit Types
   const [availableCities, setAvailableCities] = useState([]);
   const [availableTypes, setAvailableTypes] = useState([]);
+  const [hostexProperties, setHostexProperties] = useState([]);
 
   // Form State
   const initialForm = {
@@ -124,6 +125,15 @@ export default function AdminPropertiesPage() {
         }
       } catch (err) {
         console.error('Error fetching cities/types for dropdown:', err);
+      }
+
+      try {
+        const hostexRes = await request.get(API_ENDPOINTS.HOSTEX.STATUS);
+        if (hostexRes.success && Array.isArray(hostexRes.data?.hostex_properties)) {
+          setHostexProperties(hostexRes.data.hostex_properties);
+        }
+      } catch (hErr) {
+        // Non-blocking if Hostex API is unreachable
       }
     };
     fetchOptions();
@@ -599,14 +609,47 @@ export default function AdminPropertiesPage() {
               </div>
 
               <div>
-                <label className="font-bold text-gray-700 block mb-1">Hostex Property ID (Mapping Channel)</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: 1001"
-                  value={formData.hostex_property_id}
-                  onChange={(e) => setFormData({ ...formData, hostex_property_id: e.target.value })}
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-mono"
-                />
+                <label className="font-bold text-gray-700 block mb-1 flex items-center justify-between">
+                  <span>Hostex Property (Channel Sync)</span>
+                  <span className="text-[11px] font-normal text-gray-400">ID Unit Hostex</span>
+                </label>
+                {hostexProperties.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <select
+                      value={formData.hostex_property_id || ''}
+                      onChange={(e) => setFormData({ ...formData, hostex_property_id: e.target.value })}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                    >
+                      <option value="">-- Pilih dari Daftar Properti Hostex --</option>
+                      {hostexProperties.map((hp) => (
+                        <option key={hp.id} value={hp.id}>
+                          {hp.title || hp.name} (ID: {hp.id})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500">Atau ID manual:</span>
+                      <input
+                        type="text"
+                        placeholder="Contoh: 12528642"
+                        value={formData.hostex_property_id}
+                        onChange={(e) => setFormData({ ...formData, hostex_property_id: e.target.value })}
+                        className="flex-1 px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-900 font-mono"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Contoh: 12528642"
+                    value={formData.hostex_property_id}
+                    onChange={(e) => setFormData({ ...formData, hostex_property_id: e.target.value })}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-mono"
+                  />
+                )}
+                <span className="text-[11px] text-gray-400 mt-1 block">
+                  Pilih unit Hostex agar reservasi otomatis memblokir kalender Airbnb, Agoda, & Booking.com.
+                </span>
               </div>
 
               <div className="col-span-1 md:col-span-2 p-4 bg-orange-50/50 border border-orange-200/80 rounded-2xl">

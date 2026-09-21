@@ -36,6 +36,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Static file serving for uploads from backend/uploads-luckystay
 app.use('/uploads-luckystay', express.static(uploadDir));
+app.use('/api/uploads-luckystay', express.static(uploadDir));
+app.use('/luckystay/uploads-luckystay', express.static(uploadDir));
 app.use('/assets', express.static(path.join(__dirname, '..')));
 
 // Multer storage setup for image uploads
@@ -89,6 +91,9 @@ dbPool.getConnection()
     } catch (e) {}
     try {
       await conn.query(`ALTER TABLE properties ADD COLUMN discount_percent INT DEFAULT 0`);
+    } catch (e) {}
+    try {
+      await conn.query(`UPDATE bank_accounts SET qris_image = NULL WHERE qris_image = '[object Object]'`);
     } catch (e) {}
     conn.release();
   })
@@ -1269,6 +1274,11 @@ app.get('/api/hostex/status', async (req, res) => {
 // ----------------------------------------------------
 app.get('/api/bank-accounts', async (req, res) => {
   try {
+    const sanitizeAccount = (item) => ({
+      ...item,
+      qris_image: (!item.qris_image || item.qris_image === '[object Object]' || typeof item.qris_image !== 'string') ? null : item.qris_image
+    });
+
     const isAdmin = req.query.admin === 'true' || req.query.page !== undefined;
     if (isAdmin) {
       const page = parseInt(req.query.page) || 1;
@@ -1293,7 +1303,7 @@ app.get('/api/bank-accounts', async (req, res) => {
 
       return res.json({
         success: true,
-        data: rows,
+        data: rows.map(sanitizeAccount),
         pagination: {
           page,
           limit,
@@ -1306,7 +1316,7 @@ app.get('/api/bank-accounts', async (req, res) => {
     const [rows] = await dbPool.query('SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY id ASC');
     res.json({
       success: true,
-      data: rows
+      data: rows.map(sanitizeAccount)
     });
   } catch (err) {
     console.error('MySQL bank accounts error:', err);
@@ -1321,19 +1331,25 @@ app.post('/api/bank-accounts', upload.single('qris_image'), async (req, res) => 
       return res.status(400).json({ success: false, message: 'Nama Bank, No Rekening, dan Atas Nama wajib diisi!' });
     }
 
-    const qris_image = req.file ? `/uploads-luckystay/${req.file.filename}` : (req.body.qris_image || null);
+    let qris_image = null;
+    if (req.file) {
+      qris_image = `/uploads-luckystay/${req.file.filename}`;
+    } else if (typeof req.body.qris_image === 'string' && req.body.qris_image.trim() && req.body.qris_image !== '[object Object]') {
+      qris_image = req.body.qris_image.trim();
+    }
+
     const activeVal = is_active !== undefined ? (is_active === '1' || is_active === 1 || is_active === 'true' || is_active === true ? 1 : 0) : 1;
 
     const [result] = await dbPool.query(
       `INSERT INTO bank_accounts (bank_name, account_number, account_holder, qris_image, instructions, is_active) 
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [bank_name, account_number, account_holder, qris_image, instructions || null, activeVal]
+      [bank_name.trim(), account_number.trim(), account_holder.trim(), qris_image, instructions ? instructions.trim() : null, activeVal]
     );
 
     res.json({
       success: true,
       message: 'Rekening/QRIS berhasil ditambahkan',
-      data: { id: result.insertId }
+      data: { id: result.insertId, qris_image }
     });
   } catch (err) {
     console.error('Create bank account error:', err);
@@ -1344,15 +1360,15 @@ app.post('/api/bank-accounts', upload.single('qris_image'), async (req, res) => 
 app.put('/api/bank-accounts/:id', upload.single('qris_image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { bank_name, account_number, account_holder, instructions, is_active } = req.body;
+    const { bank_name, account_number, account_holder, instructions, is_active, remove_qris, is_qris } = req.body;
 
     let updateFields = [];
     let params = [];
 
-    if (bank_name !== undefined) { updateFields.push('bank_name = ?'); params.push(bank_name); }
-    if (account_number !== undefined) { updateFields.push('account_number = ?'); params.push(account_number); }
-    if (account_holder !== undefined) { updateFields.push('account_holder = ?'); params.push(account_holder); }
-    if (instructions !== undefined) { updateFields.push('instructions = ?'); params.push(instructions); }
+    if (bank_name !== undefined) { updateFields.push('bank_name = ?'); params.push(String(bank_name).trim()); }
+    if (account_number !== undefined) { updateFields.push('account_number = ?'); params.push(String(account_number).trim()); }
+    if (account_holder !== undefined) { updateFields.push('account_holder = ?'); params.push(String(account_holder).trim()); }
+    if (instructions !== undefined) { updateFields.push('instructions = ?'); params.push(instructions ? String(instructions).trim() : null); }
     if (is_active !== undefined) {
       const activeVal = is_active === '1' || is_active === 1 || is_active === 'true' || is_active === true ? 1 : 0;
       updateFields.push('is_active = ?');
@@ -1361,8 +1377,11 @@ app.put('/api/bank-accounts/:id', upload.single('qris_image'), async (req, res) 
     if (req.file) {
       updateFields.push('qris_image = ?');
       params.push(`/uploads-luckystay/${req.file.filename}`);
-    } else if (req.body.remove_qris === 'true' || req.body.remove_qris === true) {
+    } else if (remove_qris === 'true' || remove_qris === true || is_qris === '0' || is_qris === 'false' || is_qris === false) {
       updateFields.push('qris_image = NULL');
+    } else if (typeof req.body.qris_image === 'string' && req.body.qris_image.trim() && req.body.qris_image !== '[object Object]') {
+      updateFields.push('qris_image = ?');
+      params.push(req.body.qris_image.trim());
     }
 
     if (updateFields.length === 0) {

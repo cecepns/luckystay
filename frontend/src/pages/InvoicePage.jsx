@@ -356,10 +356,10 @@ export default function InvoicePage() {
                       </button>
                     </div>
 
-                    {bank.qris_image && (
+                    {bank.qris_image && bank.qris_image !== '[object Object]' && (
                       <div className="pt-2 pb-1 flex flex-col items-center justify-center bg-white rounded-xl p-3 border border-purple-100">
-                        <div className="w-44 h-44 bg-white p-1 rounded-lg flex items-center justify-center">
-                          <img
+                        <div className="w-48 h-48 bg-white p-1 rounded-lg flex items-center justify-center overflow-hidden">
+                          <ImageWithFallback
                             src={bank.qris_image}
                             alt={`QRIS ${bank.bank_name}`}
                             className="w-full h-full object-contain"
