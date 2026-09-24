@@ -345,8 +345,8 @@ export default function HomePage() {
                 type="button"
                 onClick={() => handleFilterChange('city', city === 'Semua Kota' ? '' : city)}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${isSelected
-                    ? 'bg-orange-500 text-white shadow-xs'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  ? 'bg-orange-500 text-white shadow-xs'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                   }`}
               >
                 {city.replace(' Selatan', '')}
@@ -574,9 +574,6 @@ export default function HomePage() {
               </span>
               <span className="flex items-center gap-1">
                 <Award className="w-4 h-4 text-orange-600" /> Jaminan Harga Resmi
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-4 h-4 text-blue-600" /> Instant Sync Hostex
               </span>
             </div>
 
@@ -817,9 +814,8 @@ export default function HomePage() {
                               {Array.from({ length: 5 }).map((_, i) => (
                                 <Star
                                   key={i}
-                                  className={`w-4 h-4 ${
-                                    i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'
-                                  }`}
+                                  className={`w-4 h-4 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'
+                                    }`}
                                 />
                               ))}
                               <span className="text-xs font-bold text-gray-700 ml-1">
@@ -860,9 +856,8 @@ export default function HomePage() {
                     key={dotIdx}
                     type="button"
                     onClick={() => setCurrentReviewSlide(dotIdx)}
-                    className={`h-2 rounded-full transition-all cursor-pointer ${
-                      currentReviewSlide === dotIdx ? 'w-6 bg-orange-500' : 'w-2 bg-gray-300 hover:bg-gray-400'
-                    }`}
+                    className={`h-2 rounded-full transition-all cursor-pointer ${currentReviewSlide === dotIdx ? 'w-6 bg-orange-500' : 'w-2 bg-gray-300 hover:bg-gray-400'
+                      }`}
                     aria-label={`Go to slide ${dotIdx + 1}`}
                   />
                 ))}
@@ -921,11 +916,10 @@ export default function HomePage() {
                   className="p-1 hover:scale-110 transition-transform cursor-pointer"
                 >
                   <Star
-                    className={`w-7 h-7 ${
-                      star <= guestReviewForm.rating
+                    className={`w-7 h-7 ${star <= guestReviewForm.rating
                         ? 'fill-amber-400 text-amber-400'
                         : 'text-gray-200 hover:text-amber-200'
-                    }`}
+                      }`}
                   />
                 </button>
               ))}

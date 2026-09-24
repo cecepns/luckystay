@@ -71,6 +71,10 @@ export default function AdminPropertiesPage() {
     price_per_night: '',
     original_price: '',
     discount_percent: 0,
+    price_per_month: '',
+    monthly_discount_percent: 15,
+    price_per_year: '',
+    yearly_discount_percent: 25,
     cleaning_fee: '50000',
     security_deposit: '200000',
     max_guests: 2,
@@ -152,6 +156,12 @@ export default function AdminPropertiesPage() {
   const handleOpenEditModal = (prop) => {
     setIsEditMode(true);
     setEditingId(prop.id);
+    const nightPrice = prop.price_per_night || '';
+    const mDisc = prop.monthly_discount_percent !== undefined ? prop.monthly_discount_percent : 15;
+    const yDisc = prop.yearly_discount_percent !== undefined ? prop.yearly_discount_percent : 25;
+    const mPrice = prop.price_per_month || (nightPrice ? Math.round(Number(nightPrice) * 30 * (1 - mDisc / 100)) : '');
+    const yPrice = prop.price_per_year || (nightPrice ? Math.round(Number(nightPrice) * 365 * (1 - yDisc / 100)) : '');
+
     setFormData({
       name: prop.name || '',
       building_name: prop.building_name || '',
@@ -160,9 +170,13 @@ export default function AdminPropertiesPage() {
       city: prop.city || 'Jakarta Selatan',
       address: prop.address || '',
       type: prop.type || 'Studio',
-      price_per_night: prop.price_per_night || '',
+      price_per_night: nightPrice,
       original_price: prop.original_price || '',
       discount_percent: prop.discount_percent || 0,
+      price_per_month: mPrice,
+      monthly_discount_percent: mDisc,
+      price_per_year: yPrice,
+      yearly_discount_percent: yDisc,
       cleaning_fee: prop.cleaning_fee || '50000',
       security_deposit: prop.security_deposit || '200000',
       max_guests: prop.max_guests || 2,
@@ -256,6 +270,10 @@ export default function AdminPropertiesPage() {
       fd.append('price_per_night', Number(formData.price_per_night));
       fd.append('original_price', formData.original_price ? Number(formData.original_price) : '');
       fd.append('discount_percent', Number(formData.discount_percent) || 0);
+      fd.append('price_per_month', formData.price_per_month ? Number(formData.price_per_month) : '');
+      fd.append('monthly_discount_percent', Number(formData.monthly_discount_percent) || 0);
+      fd.append('price_per_year', formData.price_per_year ? Number(formData.price_per_year) : '');
+      fd.append('yearly_discount_percent', Number(formData.yearly_discount_percent) || 0);
       fd.append('cleaning_fee', Number(formData.cleaning_fee) || 0);
       fd.append('security_deposit', Number(formData.security_deposit) || 0);
       fd.append('max_guests', Number(formData.max_guests) || 2);
@@ -368,7 +386,7 @@ export default function AdminPropertiesPage() {
                   <th className="py-3.5 px-4">Foto & Nama Unit</th>
                   <th className="py-3.5 px-4">Tipe & Kapasitas</th>
                   <th className="py-3.5 px-4">Lokasi & Kota</th>
-                  <th className="py-3.5 px-4">Tarif Sewa / Malam</th>
+                  <th className="py-3.5 px-4 min-w-[210px]">Tarif Sewa (Harian / Bln / Thn)</th>
                   <th className="py-3.5 px-4">Deposit</th>
                   <th className="py-3.5 px-4">Hostex ID</th>
                   <th className="py-3.5 px-4 text-center">Aksi</th>
@@ -386,72 +404,113 @@ export default function AdminPropertiesPage() {
                     </td>
                   </tr>
                 ) : (
-                  properties.map((prop) => (
-                    <tr key={prop.id} className="hover:bg-gray-50/80 transition-colors">
-                      
-                      {/* Name & Photo */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl overflow-hidden border border-gray-200 shrink-0">
-                            <ImageWithFallback
-                              src={prop.images?.[0]}
-                              alt={prop.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900 line-clamp-1 max-w-[240px]">{prop.name}</div>
-                            <div className="text-[11px] text-gray-500">{prop.building_name} {prop.unit_number ? `(${prop.unit_number})` : ''}</div>
-                          </div>
-                        </div>
-                      </td>
+                  properties.map((prop) => {
+                    const priceDaily = Number(prop.price_per_night) || 0;
+                    const monthlyDisc = prop.monthly_discount_percent !== undefined ? Number(prop.monthly_discount_percent) : 15;
+                    const priceMonthly = Number(prop.price_per_month) || Math.round(priceDaily * 30 * (1 - monthlyDisc / 100));
+                    const yearlyDisc = prop.yearly_discount_percent !== undefined ? Number(prop.yearly_discount_percent) : 25;
+                    const priceYearly = Number(prop.price_per_year) || Math.round(priceDaily * 365 * (1 - yearlyDisc / 100));
 
-                      {/* Type */}
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-gray-800 block">{prop.type}</span>
-                        <span className="text-[11px] text-gray-500">{prop.max_guests} Tamu • {prop.bedrooms} Kamar</span>
-                      </td>
-
-                      {/* Location */}
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-gray-800">{prop.city}</div>
-                        <div className="text-[11px] text-gray-500 truncate max-w-[150px]">{prop.location}</div>
-                      </td>
-
-                      {/* Price */}
-                      <td className="py-3 px-4">
-                        {prop.discount_percent > 0 && prop.original_price ? (
-                          <div>
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <span className="line-through text-gray-400 text-[10px]">
-                                {formatRupiah(prop.original_price)}
-                              </span>
-                              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-200">
-                                {prop.discount_percent}% OFF
-                              </span>
+                    return (
+                      <tr key={prop.id} className="hover:bg-gray-50/80 transition-colors">
+                        
+                        {/* Name & Photo */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl overflow-hidden border border-gray-200 shrink-0">
+                              <ImageWithFallback
+                                src={prop.images?.[0]}
+                                alt={prop.name}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
-                            <div className="font-bold text-red-600 text-xs">
-                              {formatRupiah(prop.price_per_night)}
+                            <div>
+                              <div className="font-bold text-gray-900 line-clamp-1 max-w-[240px]">{prop.name}</div>
+                              <div className="text-[11px] text-gray-500">{prop.building_name} {prop.unit_number ? `(${prop.unit_number})` : ''}</div>
                             </div>
                           </div>
-                        ) : (
-                          <div className="font-bold text-orange-600">
-                            {formatRupiah(prop.price_per_night)}
+                        </td>
+
+                        {/* Type */}
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-gray-800 block">{prop.type}</span>
+                          <span className="text-[11px] text-gray-500">{prop.max_guests} Tamu • {prop.bedrooms} Kamar</span>
+                        </td>
+
+                        {/* Location */}
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-gray-800">{prop.city}</div>
+                          <div className="text-[11px] text-gray-500 truncate max-w-[150px]">{prop.location}</div>
+                        </td>
+
+                        {/* Price (Harian, Bulanan, Tahunan) */}
+                        <td className="py-3 px-4">
+                          <div className="space-y-1 text-xs">
+                            {/* Harian */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] text-gray-400 font-semibold uppercase">Harian:</span>
+                              <div className="text-right">
+                                {prop.discount_percent > 0 && prop.original_price ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="line-through text-gray-400 text-[10px]">
+                                      {formatRupiah(prop.original_price)}
+                                    </span>
+                                    <span className="font-bold text-red-600">
+                                      {formatRupiah(prop.price_per_night)}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-200">
+                                      {prop.discount_percent}%
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-bold text-gray-900">{formatRupiah(prop.price_per_night)}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Bulanan */}
+                            <div className="flex items-center justify-between gap-2 bg-orange-50/70 px-1.5 py-0.5 rounded border border-orange-100">
+                              <span className="text-[10px] text-orange-700 font-semibold uppercase">Bulanan:</span>
+                              <div className="flex items-center gap-1 text-right">
+                                <span className="font-bold text-orange-600 text-xs">
+                                  {formatRupiah(priceMonthly)}
+                                </span>
+                                {monthlyDisc > 0 && (
+                                  <span className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1 rounded">
+                                    -{monthlyDisc}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Tahunan */}
+                            <div className="flex items-center justify-between gap-2 bg-emerald-50/60 px-1.5 py-0.5 rounded border border-emerald-100">
+                              <span className="text-[10px] text-emerald-700 font-semibold uppercase">Tahunan:</span>
+                              <div className="flex items-center gap-1 text-right">
+                                <span className="font-bold text-emerald-700 text-xs">
+                                  {formatRupiah(priceYearly)}
+                                </span>
+                                {yearlyDisc > 0 && (
+                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
+                                    -{yearlyDisc}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Deposit */}
-                      <td className="py-3 px-4 text-gray-600">
-                        {formatRupiah(prop.security_deposit || 200000)}
-                      </td>
+                        {/* Deposit */}
+                        <td className="py-3 px-4 text-gray-600 font-medium">
+                          {formatRupiah(prop.security_deposit || 200000)}
+                        </td>
 
-                      {/* Hostex ID */}
-                      <td className="py-3 px-4">
-                        <span className="font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-semibold">
-                          {prop.hostex_property_id || '-'}
-                        </span>
-                      </td>
+                        {/* Hostex ID */}
+                        <td className="py-3 px-4">
+                          <span className="font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-semibold">
+                            {prop.hostex_property_id || '-'}
+                          </span>
+                        </td>
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
@@ -474,11 +533,12 @@ export default function AdminPropertiesPage() {
                       </td>
 
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
           {/* Pagination */}
           {!loading && properties.length > 0 && (
@@ -679,87 +739,233 @@ export default function AdminPropertiesPage() {
                 </span>
               </div>
 
-              <div className="col-span-1 md:col-span-2 p-4 bg-orange-50/50 border border-orange-200/80 rounded-2xl">
-                <div className="flex items-center justify-between mb-3">
+              <div className="col-span-1 md:col-span-2 p-4 bg-orange-50/50 border border-orange-200/80 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-orange-200/60">
                   <span className="text-xs font-bold text-orange-950 uppercase tracking-wider flex items-center gap-1.5">
                     <Tag className="w-4 h-4 text-orange-600" />
-                    Skema Harga & Promo Diskon
+                    Skema Tarif & Promo Diskon (Harian, Bulanan, Tahunan)
                   </span>
                   {Number(formData.discount_percent) > 0 && (
                     <span className="text-xs font-black bg-red-600 text-white px-2.5 py-0.5 rounded-full shadow-sm">
-                      Hemat {formData.discount_percent}%
+                      Hemat {formData.discount_percent}% (Harian)
                     </span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">
-                      Tarif Bayar Final (Rp) <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="Contoh: 3140000"
-                      value={formData.price_per_night}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const orig = Number(formData.original_price);
-                        let disc = formData.discount_percent;
-                        if (orig && Number(val) > 0 && orig > Number(val)) {
-                          disc = Math.round(((orig - Number(val)) / orig) * 100);
-                        }
-                        setFormData({ ...formData, price_per_night: val, discount_percent: disc });
-                      }}
-                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-mono font-black text-red-600 focus:ring-2 focus:ring-red-500"
-                    />
-                    <p className="text-[11px] text-gray-400 mt-1">Harga riil yang dibayar tamu</p>
+                {/* 1. Tarif Harian */}
+                <div>
+                  <div className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+                    1. Tarif Sewa Harian (/malam)
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Tarif Bayar Final / Malam (Rp) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="Contoh: 475000"
+                        value={formData.price_per_night}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const numVal = Number(val) || 0;
+                          const orig = Number(formData.original_price);
+                          let disc = formData.discount_percent;
+                          if (orig && numVal > 0 && orig > numVal) {
+                            disc = Math.round(((orig - numVal) / orig) * 100);
+                          }
+                          const mDisc = Number(formData.monthly_discount_percent) || 15;
+                          const yDisc = Number(formData.yearly_discount_percent) || 25;
+                          const autoMonth = numVal > 0 ? Math.round(numVal * 30 * (1 - mDisc / 100)) : '';
+                          const autoYear = numVal > 0 ? Math.round(numVal * 365 * (1 - yDisc / 100)) : '';
+                          setFormData({
+                            ...formData,
+                            price_per_night: val,
+                            discount_percent: disc,
+                            price_per_month: autoMonth,
+                            price_per_year: autoYear
+                          });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-mono font-black text-red-600 focus:ring-2 focus:ring-red-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Harga riil per malam</p>
+                    </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">
-                      Harga Normal / Coret (Rp)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Contoh: 3290000"
-                      value={formData.original_price}
-                      onChange={(e) => {
-                        const origVal = e.target.value;
-                        const curr = Number(formData.price_per_night);
-                        let disc = 0;
-                        if (Number(origVal) > 0 && curr > 0 && Number(origVal) > curr) {
-                          disc = Math.round(((Number(origVal) - curr) / Number(origVal)) * 100);
-                        }
-                        setFormData({ ...formData, original_price: origVal, discount_percent: disc });
-                      }}
-                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-700 font-mono focus:ring-2 focus:ring-orange-500"
-                    />
-                    <p className="text-[11px] text-gray-400 mt-1">Dicoret jika &gt; harga bayar</p>
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Harga Normal / Coret / Malam (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Contoh: 500000"
+                        value={formData.original_price}
+                        onChange={(e) => {
+                          const origVal = e.target.value;
+                          const curr = Number(formData.price_per_night);
+                          let disc = 0;
+                          if (Number(origVal) > 0 && curr > 0 && Number(origVal) > curr) {
+                            disc = Math.round(((Number(origVal) - curr) / Number(origVal)) * 100);
+                          }
+                          setFormData({ ...formData, original_price: origVal, discount_percent: disc });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-700 font-mono focus:ring-2 focus:ring-orange-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Dicoret jika &gt; tarif final</p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Diskon Harian (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        placeholder="Contoh: 5"
+                        value={formData.discount_percent || ''}
+                        onChange={(e) => {
+                          const discVal = Number(e.target.value) || 0;
+                          let newPrice = formData.price_per_night;
+                          const orig = Number(formData.original_price);
+                          if (orig > 0 && discVal > 0) {
+                            newPrice = Math.round(orig * (1 - discVal / 100));
+                          }
+                          setFormData({ ...formData, discount_percent: discVal, price_per_night: newPrice });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-emerald-700 font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Badge "Hemat X%" harian</p>
+                    </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">
-                      Diskon Label (%)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="99"
-                      placeholder="Contoh: 5"
-                      value={formData.discount_percent || ''}
-                      onChange={(e) => {
-                        const discVal = Number(e.target.value) || 0;
-                        let newPrice = formData.price_per_night;
-                        const orig = Number(formData.original_price);
-                        if (orig > 0 && discVal > 0) {
-                          newPrice = Math.round(orig * (1 - discVal / 100));
-                        }
-                        setFormData({ ...formData, discount_percent: discVal, price_per_night: newPrice });
-                      }}
-                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-emerald-700 font-mono font-bold focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <p className="text-[11px] text-gray-400 mt-1">Badge "Hemat X%" pada card</p>
+                {/* 2. Tarif Bulanan */}
+                <div className="pt-2 border-t border-orange-200/50">
+                  <div className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-orange-600 inline-block"></span>
+                      2. Tarif Sewa Bulanan (30 Hari)
+                    </span>
+                    {formData.price_per_night && (
+                      <span className="text-[10px] text-gray-400 font-normal">
+                        Kotor (30 hr): {formatRupiah(Number(formData.price_per_night) * 30)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Diskon Sewa Bulanan (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="90"
+                        placeholder="15"
+                        value={formData.monthly_discount_percent}
+                        onChange={(e) => {
+                          const disc = Number(e.target.value) || 0;
+                          const nightPrice = Number(formData.price_per_night) || 0;
+                          const newMonthPrice = nightPrice > 0 ? Math.round(nightPrice * 30 * (1 - disc / 100)) : formData.price_per_month;
+                          setFormData({ ...formData, monthly_discount_percent: disc, price_per_month: newMonthPrice });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-orange-700 font-mono font-bold focus:ring-2 focus:ring-orange-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Contoh diskon sewa bulanan: 15%</p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Tarif Bulanan Bersih (Rp / Bulan)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Contoh: 12112500"
+                        value={formData.price_per_month}
+                        onChange={(e) => {
+                          const mVal = e.target.value;
+                          const nightPrice = Number(formData.price_per_night) || 0;
+                          let calcDisc = formData.monthly_discount_percent;
+                          if (nightPrice > 0 && Number(mVal) > 0) {
+                            const raw30 = nightPrice * 30;
+                            if (raw30 > Number(mVal)) {
+                              calcDisc = Math.round(((raw30 - Number(mVal)) / raw30) * 100);
+                            }
+                          }
+                          setFormData({ ...formData, price_per_month: mVal, monthly_discount_percent: calcDisc });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-mono font-bold text-orange-600 focus:ring-2 focus:ring-orange-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {formData.price_per_month ? `Bersih: ${formatRupiah(formData.price_per_month)} / bulan` : 'Otomatis dihitung dari diskon bulanan'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Tarif Tahunan */}
+                <div className="pt-2 border-t border-orange-200/50">
+                  <div className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                      3. Tarif Sewa Tahunan (12 Bulan)
+                    </span>
+                    {formData.price_per_night && (
+                      <span className="text-[10px] text-gray-400 font-normal">
+                        Kotor (365 hr): {formatRupiah(Number(formData.price_per_night) * 365)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Diskon Sewa Tahunan (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="90"
+                        placeholder="25"
+                        value={formData.yearly_discount_percent}
+                        onChange={(e) => {
+                          const disc = Number(e.target.value) || 0;
+                          const nightPrice = Number(formData.price_per_night) || 0;
+                          const newYearPrice = nightPrice > 0 ? Math.round(nightPrice * 365 * (1 - disc / 100)) : formData.price_per_year;
+                          setFormData({ ...formData, yearly_discount_percent: disc, price_per_year: newYearPrice });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-emerald-700 font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Contoh diskon sewa tahunan: 25%</p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        Tarif Tahunan Bersih (Rp / Tahun)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Contoh: 130000000"
+                        value={formData.price_per_year}
+                        onChange={(e) => {
+                          const yVal = e.target.value;
+                          const nightPrice = Number(formData.price_per_night) || 0;
+                          let calcDisc = formData.yearly_discount_percent;
+                          if (nightPrice > 0 && Number(yVal) > 0) {
+                            const raw365 = nightPrice * 365;
+                            if (raw365 > Number(yVal)) {
+                              calcDisc = Math.round(((raw365 - Number(yVal)) / raw365) * 100);
+                            }
+                          }
+                          setFormData({ ...formData, price_per_year: yVal, yearly_discount_percent: calcDisc });
+                        }}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 font-mono font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {formData.price_per_year ? `Bersih: ${formatRupiah(formData.price_per_year)} / tahun` : 'Otomatis dihitung dari diskon tahunan'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -103,6 +103,7 @@ export default function BookingCheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      const finalRentalType = bookingState.rentalType || (parsedNights >= 365 ? 'yearly' : parsedNights >= 30 ? 'monthly' : 'daily');
       const payload = {
         property_id: property.id,
         user_id: user?.id || null,
@@ -112,6 +113,7 @@ export default function BookingCheckoutPage() {
         number_of_guests: guestsCount,
         check_in_date: checkInDate,
         check_out_date: checkOutDate,
+        rental_type: finalRentalType,
         special_requests: specialRequests,
         payment_method: paymentMethod
       };
@@ -370,8 +372,22 @@ export default function BookingCheckoutPage() {
               <div className="space-y-2 pt-3 border-t border-gray-100 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>Sewa ({parsedNights} malam)</span>
-                  <span className="font-semibold text-gray-800">{formatRupiah(parsedTotalRoomPrice)}</span>
+                  <span className={`font-semibold ${bookingState.discountAmount > 0 ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                    {formatRupiah(bookingState.rawRoomPrice || parsedTotalRoomPrice)}
+                  </span>
                 </div>
+                {bookingState.discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                    <span>{bookingState.discountLabel || 'Diskon Sewa'}</span>
+                    <span>- {formatRupiah(bookingState.discountAmount)}</span>
+                  </div>
+                )}
+                {bookingState.discountAmount > 0 && (
+                  <div className="flex justify-between text-gray-700 font-semibold">
+                    <span>Tarif Bersih Kamar</span>
+                    <span className="font-bold text-orange-600">{formatRupiah(parsedTotalRoomPrice)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Biaya Kebersihan</span>
                   <span className="font-semibold text-gray-800">{formatRupiah(parsedCleaningFee)}</span>

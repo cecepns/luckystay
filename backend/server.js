@@ -93,6 +93,27 @@ dbPool.getConnection()
       await conn.query(`ALTER TABLE properties ADD COLUMN discount_percent INT DEFAULT 0`);
     } catch (e) {}
     try {
+      await conn.query(`ALTER TABLE properties ADD COLUMN price_per_month DECIMAL(12,2) DEFAULT NULL`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE properties ADD COLUMN monthly_discount_percent INT DEFAULT 0`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE properties ADD COLUMN price_per_year DECIMAL(12,2) DEFAULT NULL`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE properties ADD COLUMN yearly_discount_percent INT DEFAULT 0`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE bookings MODIFY COLUMN payment_status ENUM('pending_payment', 'waiting_approval', 'dp_paid', 'confirmed', 'rejected', 'cancelled', 'completed') NOT NULL DEFAULT 'pending_payment'`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE bookings ADD COLUMN down_payment_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00`);
+    } catch (e) {}
+    try {
+      await conn.query(`ALTER TABLE bookings ADD COLUMN rental_type ENUM('daily', 'monthly', 'yearly') NOT NULL DEFAULT 'daily'`);
+    } catch (e) {}
+    try {
       await conn.query(`UPDATE bank_accounts SET qris_image = NULL WHERE qris_image = '[object Object]'`);
     } catch (e) {}
     conn.release();
@@ -665,12 +686,18 @@ app.post('/api/properties', upload.array('images', 20), async (req, res) => {
       parsedOriginalPrice = Math.round(Number(price_per_night) / (1 - parsedDiscountPercent / 100));
     }
 
+    let parsedMonthlyDiscount = req.body.monthly_discount_percent !== undefined ? Number(req.body.monthly_discount_percent) : 15;
+    let parsedPricePerMonth = req.body.price_per_month ? Number(req.body.price_per_month) : Math.round(Number(price_per_night) * 30 * (1 - (parsedMonthlyDiscount / 100)));
+    let parsedYearlyDiscount = req.body.yearly_discount_percent !== undefined ? Number(req.body.yearly_discount_percent) : 25;
+    let parsedPricePerYear = req.body.price_per_year ? Number(req.body.price_per_year) : Math.round(Number(price_per_night) * 365 * (1 - (parsedYearlyDiscount / 100)));
+
     const [result] = await dbPool.query(
       `INSERT INTO properties (
         name, slug, building_name, unit_number, location, city, address, map_url, type,
-        price_per_night, original_price, discount_percent, cleaning_fee, security_deposit, max_guests, bedrooms, beds, bathrooms,
+        price_per_night, original_price, discount_percent, price_per_month, monthly_discount_percent,
+        price_per_year, yearly_discount_percent, cleaning_fee, security_deposit, max_guests, bedrooms, beds, bathrooms,
         size_sqm, description, house_rules, amenities, images, hostex_property_id, is_active, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
       [
         name,
         slug,
@@ -684,6 +711,10 @@ app.post('/api/properties', upload.array('images', 20), async (req, res) => {
         Number(price_per_night),
         parsedOriginalPrice,
         parsedDiscountPercent,
+        parsedPricePerMonth,
+        parsedMonthlyDiscount,
+        parsedPricePerYear,
+        parsedYearlyDiscount,
         Number(cleaning_fee) || 0,
         Number(security_deposit) || 0,
         Number(max_guests) || 2,
@@ -763,6 +794,12 @@ app.put('/api/properties/:id', upload.array('images', 20), async (req, res) => {
       targetOriginal = Math.round(targetPrice / (1 - targetDiscount / 100));
     }
 
+    let targetMonthlyDiscount = body.monthly_discount_percent !== undefined ? Number(body.monthly_discount_percent) : (current.monthly_discount_percent || 15);
+    let targetPricePerMonth = body.price_per_month ? Number(body.price_per_month) : (current.price_per_month || Math.round(targetPrice * 30 * (1 - targetMonthlyDiscount / 100)));
+
+    let targetYearlyDiscount = body.yearly_discount_percent !== undefined ? Number(body.yearly_discount_percent) : (current.yearly_discount_percent || 25);
+    let targetPricePerYear = body.price_per_year ? Number(body.price_per_year) : (current.price_per_year || Math.round(targetPrice * 365 * (1 - targetYearlyDiscount / 100)));
+
     await dbPool.query(
       `UPDATE properties SET
         name = ?,
@@ -776,6 +813,10 @@ app.put('/api/properties/:id', upload.array('images', 20), async (req, res) => {
         price_per_night = ?,
         original_price = ?,
         discount_percent = ?,
+        price_per_month = ?,
+        monthly_discount_percent = ?,
+        price_per_year = ?,
+        yearly_discount_percent = ?,
         cleaning_fee = ?,
         security_deposit = ?,
         max_guests = ?,
@@ -803,6 +844,10 @@ app.put('/api/properties/:id', upload.array('images', 20), async (req, res) => {
         targetPrice,
         targetOriginal,
         targetDiscount || 0,
+        targetPricePerMonth,
+        targetMonthlyDiscount,
+        targetPricePerYear,
+        targetYearlyDiscount,
         body.cleaning_fee !== undefined ? Number(body.cleaning_fee) : current.cleaning_fee,
         body.security_deposit !== undefined ? Number(body.security_deposit) : current.security_deposit,
         body.max_guests !== undefined ? Number(body.max_guests) : current.max_guests,
@@ -898,9 +943,9 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tanggal check-out harus lebih besar dari tanggal check-in!' });
     }
 
-    // Check conflict with existing confirmed bookings
+    // Check conflict with existing confirmed or DP bookings
     const [conflictRows] = await dbPool.query(
-      `SELECT id FROM bookings WHERE property_id = ? AND payment_status = 'confirmed' AND (check_in_date < ? AND check_out_date > ?)`,
+      `SELECT id FROM bookings WHERE property_id = ? AND payment_status IN ('confirmed', 'dp_paid') AND (check_in_date < ? AND check_out_date > ?)`,
       [property.id, check_out_date, check_in_date]
     );
 
@@ -911,8 +956,24 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
       });
     }
 
+    let rentalType = req.body.rental_type || 'daily';
     const roomPricePerNight = Number(property.price_per_night);
-    const totalRoomPrice = roomPricePerNight * totalNights;
+    let totalRoomPrice = roomPricePerNight * totalNights;
+
+    if (rentalType === 'yearly' || totalNights >= 365) {
+      rentalType = 'yearly';
+      const yearlyPrice = Number(property.price_per_year) || Math.round(roomPricePerNight * 365 * 0.75);
+      const fullYears = Math.floor(totalNights / 365);
+      const remDays = totalNights % 365;
+      totalRoomPrice = (fullYears * yearlyPrice) + Math.round(remDays * (yearlyPrice / 365));
+    } else if (rentalType === 'monthly' || totalNights >= 30) {
+      rentalType = 'monthly';
+      const monthlyPrice = Number(property.price_per_month) || Math.round(roomPricePerNight * 30 * 0.85);
+      const fullMonths = Math.floor(totalNights / 30);
+      const remDays = totalNights % 30;
+      totalRoomPrice = (fullMonths * monthlyPrice) + Math.round(remDays * (monthlyPrice / 30));
+    }
+
     const cleaningFee = Number(property.cleaning_fee) || 0;
     const securityDeposit = Number(property.security_deposit) || 0;
     const grandTotal = totalRoomPrice + cleaningFee + securityDeposit;
@@ -924,10 +985,10 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
     const [insertResult] = await dbPool.query(
       `INSERT INTO bookings (
         invoice_number, property_id, user_id, guest_name, guest_email, guest_phone, number_of_guests,
-        check_in_date, check_out_date, total_nights, room_price_per_night, total_room_price,
-        cleaning_fee, security_deposit, grand_total, special_requests, payment_method,
+        check_in_date, check_out_date, total_nights, rental_type, room_price_per_night, total_room_price,
+        cleaning_fee, security_deposit, grand_total, down_payment_amount, special_requests, payment_method,
         payment_status, hostex_sync_status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', 'not_synced', NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending_payment', 'not_synced', NOW())`,
       [
         invoiceNumber,
         property.id,
@@ -939,6 +1000,7 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
         check_in_date,
         check_out_date,
         totalNights,
+        rentalType,
         roomPricePerNight,
         totalRoomPrice,
         cleaningFee,
@@ -962,6 +1024,189 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('MySQL create booking error:', err);
     res.status(500).json({ success: false, message: 'Gagal memproses booking', error: err.message });
+  }
+});
+
+// POST /api/bookings/admin (Direct create booking by Admin with custom status & DP)
+app.post('/api/bookings/admin', async (req, res) => {
+  try {
+    const {
+      property_id,
+      guest_name,
+      guest_email,
+      guest_phone,
+      number_of_guests,
+      check_in_date,
+      check_out_date,
+      rental_type,
+      payment_status,
+      payment_method,
+      down_payment_amount,
+      room_price_per_night,
+      total_room_price,
+      cleaning_fee,
+      security_deposit,
+      grand_total,
+      special_requests,
+      admin_notes
+    } = req.body;
+
+    if (!property_id || !guest_name || !guest_phone || !check_in_date || !check_out_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lengkapi data sewa: properti, nama tamu, kontak HP/WA, dan tanggal sewa!'
+      });
+    }
+
+    const [propRows] = await dbPool.query('SELECT * FROM properties WHERE id = ?', [property_id]);
+    if (!propRows || propRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Properti yang dipilih tidak valid!' });
+    }
+    const property = propRows[0];
+
+    const start = new Date(check_in_date);
+    const end = new Date(check_out_date);
+    const totalNights = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+
+    if (totalNights <= 0) {
+      return res.status(400).json({ success: false, message: 'Tanggal check-out harus lebih besar dari check-in!' });
+    }
+
+    // Check collision with confirmed / dp_paid bookings on this property
+    const [conflictRows] = await dbPool.query(
+      `SELECT id, invoice_number, guest_name FROM bookings WHERE property_id = ? AND payment_status IN ('confirmed', 'dp_paid') AND (check_in_date < ? AND check_out_date > ?)`,
+      [property.id, check_out_date, check_in_date]
+    );
+
+    if (conflictRows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Tanggal yang dipilih bentrok dengan pemesanan #${conflictRows[0].invoice_number} (${conflictRows[0].guest_name})!`
+      });
+    }
+
+    const finalStatus = payment_status || 'pending_payment';
+    const finalRentalType = rental_type || 'daily';
+    const finalDP = Number(down_payment_amount) || 0;
+    const finalRate = room_price_per_night !== undefined ? Number(room_price_per_night) : Number(property.price_per_night);
+    const finalTotalRoom = total_room_price !== undefined ? Number(total_room_price) : (finalRate * totalNights);
+    const finalClean = cleaning_fee !== undefined ? Number(cleaning_fee) : Number(property.cleaning_fee || 0);
+    const finalDeposit = security_deposit !== undefined ? Number(security_deposit) : Number(property.security_deposit || 0);
+    const finalGrand = grand_total !== undefined ? Number(grand_total) : (finalTotalRoom + finalClean + finalDeposit);
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const invoiceNumber = `INV-ADM${dateStr}-${randNum}`;
+
+    const [insertResult] = await dbPool.query(
+      `INSERT INTO bookings (
+        invoice_number, property_id, user_id, guest_name, guest_email, guest_phone, number_of_guests,
+        check_in_date, check_out_date, total_nights, rental_type, room_price_per_night, total_room_price,
+        cleaning_fee, security_deposit, grand_total, down_payment_amount, special_requests, admin_notes,
+        payment_method, payment_status, hostex_sync_status, created_at
+      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'not_synced', NOW())`,
+      [
+        invoiceNumber,
+        property.id,
+        guest_name.trim(),
+        guest_email ? guest_email.trim() : '',
+        guest_phone.trim(),
+        Number(number_of_guests) || 1,
+        check_in_date,
+        check_out_date,
+        totalNights,
+        finalRentalType,
+        finalRate,
+        finalTotalRoom,
+        finalClean,
+        finalDeposit,
+        finalGrand,
+        finalDP,
+        special_requests ? special_requests.trim() : '',
+        admin_notes ? admin_notes.trim() : 'Dibuat langsung oleh admin',
+        payment_method || 'cash',
+        finalStatus
+      ]
+    );
+
+    const [newBooking] = await dbPool.query('SELECT * FROM bookings WHERE id = ?', [insertResult.insertId]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Sewa baru berhasil diinput!',
+      data: {
+        ...newBooking[0],
+        property
+      }
+    });
+  } catch (err) {
+    console.error('MySQL admin create booking error:', err);
+    res.status(500).json({ success: false, message: 'Gagal membuat sewa baru', error: err.message });
+  }
+});
+
+// GET /api/bookings/timeline (Monthly Timeline & Gantt Chart data)
+app.get('/api/bookings/timeline', async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = parseInt(req.query.month) || (new Date().getMonth() + 1); // 1-12
+    const propertyId = parseInt(req.query.property_id) || 0;
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+    // 1. Get properties
+    let propQuery = 'SELECT id, name, building_name, unit_number, type, city, location, price_per_night, price_per_month, price_per_year, images FROM properties WHERE is_active = 1';
+    let propParams = [];
+    if (propertyId > 0) {
+      propQuery += ' AND id = ?';
+      propParams.push(propertyId);
+    }
+    propQuery += ' ORDER BY building_name ASC, unit_number ASC, name ASC';
+    const [properties] = await dbPool.query(propQuery, propParams);
+
+    // 2. Get bookings overlapping with this month (ignore rejected or cancelled)
+    let bookQuery = `
+      SELECT 
+        b.id, b.invoice_number, b.property_id, b.guest_name, b.guest_phone, b.guest_email,
+        b.number_of_guests, b.check_in_date, b.check_out_date, b.total_nights,
+        b.rental_type, b.room_price_per_night, b.total_room_price, b.grand_total,
+        b.down_payment_amount, b.payment_status, b.payment_method, b.admin_notes,
+        p.name AS property_name, p.building_name, p.unit_number
+      FROM bookings b
+      JOIN properties p ON b.property_id = p.id
+      WHERE (b.check_in_date <= ? AND b.check_out_date >= ?)
+        AND b.payment_status NOT IN ('rejected', 'cancelled')
+    `;
+    let bookParams = [endDate, startDate];
+    if (propertyId > 0) {
+      bookQuery += ' AND b.property_id = ?';
+      bookParams.push(propertyId);
+    }
+    bookQuery += ' ORDER BY b.check_in_date ASC';
+    const [bookings] = await dbPool.query(bookQuery, bookParams);
+
+    const formattedProperties = properties.map(p => ({
+      ...p,
+      images: typeof p.images === 'string' ? JSON.parse(p.images || '[]') : (p.images || [])
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        year,
+        month,
+        startDate,
+        endDate,
+        daysInMonth,
+        properties: formattedProperties,
+        bookings
+      }
+    });
+  } catch (err) {
+    console.error('MySQL bookings timeline error:', err);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data timeline', error: err.message });
   }
 });
 
@@ -1278,7 +1523,9 @@ app.put('/api/bookings/:id', async (req, res) => {
       total_room_price,
       cleaning_fee,
       security_deposit,
-      grand_total
+      grand_total,
+      down_payment_amount,
+      rental_type
     } = req.body;
 
     let updateFields = [];
@@ -1312,6 +1559,8 @@ app.put('/api/bookings/:id', async (req, res) => {
 
     if (payment_status !== undefined) { updateFields.push('payment_status = ?'); params.push(payment_status); }
     if (payment_method !== undefined) { updateFields.push('payment_method = ?'); params.push(payment_method); }
+    if (rental_type !== undefined) { updateFields.push('rental_type = ?'); params.push(rental_type); }
+    if (down_payment_amount !== undefined) { updateFields.push('down_payment_amount = ?'); params.push(Number(down_payment_amount) || 0); }
     if (special_requests !== undefined) { updateFields.push('special_requests = ?'); params.push(special_requests ? String(special_requests).trim() : null); }
     if (admin_notes !== undefined) { updateFields.push('admin_notes = ?'); params.push(admin_notes ? String(admin_notes).trim() : null); }
     if (room_price_per_night !== undefined) { updateFields.push('room_price_per_night = ?'); params.push(Number(room_price_per_night) || 0); }

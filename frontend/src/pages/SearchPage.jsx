@@ -229,7 +229,23 @@ export default function SearchPage() {
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setDurationTab(tab)}
+                  onClick={() => {
+                    setDurationTab(tab);
+                    const start = startDate ? new Date(startDate) : new Date();
+                    if (tab === 'Bulanan') {
+                      const nextMonth = new Date(start);
+                      nextMonth.setDate(nextMonth.getDate() + 30);
+                      setEndDate(nextMonth);
+                    } else if (tab === 'Tahunan') {
+                      const nextYear = new Date(start);
+                      nextYear.setDate(nextYear.getDate() + 365);
+                      setEndDate(nextYear);
+                    } else {
+                      const nextDay = new Date(start);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      setEndDate(nextDay);
+                    }
+                  }}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     durationTab === tab
                       ? 'bg-red-500 text-white shadow-xs'
@@ -528,12 +544,22 @@ export default function SearchPage() {
 
                         {/* Bottom Tags (Discount + Availability) */}
                         <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
-                          {hasDiscount && (
+                          {durationTab === 'Bulanan' ? (
+                            <span className="bg-[#d93a3a] text-white text-[10px] font-extrabold px-2.5 py-1 rounded-md shadow-xs flex items-center gap-1">
+                              <Percent className="w-3 h-3 stroke-[2.5]" />
+                              Hemat {prop.monthly_discount_percent !== undefined ? prop.monthly_discount_percent : 15}%
+                            </span>
+                          ) : durationTab === 'Tahunan' ? (
+                            <span className="bg-[#d93a3a] text-white text-[10px] font-extrabold px-2.5 py-1 rounded-md shadow-xs flex items-center gap-1">
+                              <Percent className="w-3 h-3 stroke-[2.5]" />
+                              Hemat {prop.yearly_discount_percent !== undefined ? prop.yearly_discount_percent : 25}%
+                            </span>
+                          ) : hasDiscount ? (
                             <span className="bg-[#d93a3a] text-white text-[10px] font-extrabold px-2.5 py-1 rounded-md shadow-xs flex items-center gap-1">
                               <Percent className="w-3 h-3 stroke-[2.5]" />
                               Hemat {discountPercent}%
                             </span>
-                          )}
+                          ) : null}
                           <div className="bg-white/95 text-gray-800 text-[10px] font-bold px-2.5 py-1 rounded-md shadow-xs border border-gray-200/50">
                             1 unit tersedia
                           </div>
@@ -616,7 +642,53 @@ export default function SearchPage() {
                           </div>
 
                           <div className="text-right">
-                            {hasDiscount ? (
+                            {durationTab === 'Bulanan' ? (
+                              (() => {
+                                const mDisc = prop.monthly_discount_percent !== undefined ? Number(prop.monthly_discount_percent) : 15;
+                                const rawMonth = price * 30;
+                                const finalMonth = Number(prop.price_per_month) || Math.round(rawMonth * (1 - mDisc / 100));
+                                return (
+                                  <div>
+                                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                                      <span className="text-xs text-gray-400 line-through font-medium">
+                                        IDR {formatRupiah(rawMonth).replace('Rp ', '')}
+                                      </span>
+                                      {mDisc > 0 && (
+                                        <span className="text-[11px] font-bold text-emerald-600">
+                                          {mDisc}% OFF
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-lg sm:text-xl font-black text-red-500 tracking-tight">
+                                      IDR {formatRupiah(finalMonth).replace('Rp ', '')} <span className="text-xs font-semibold text-gray-400">/ bulan</span>
+                                    </p>
+                                  </div>
+                                );
+                              })()
+                            ) : durationTab === 'Tahunan' ? (
+                              (() => {
+                                const yDisc = prop.yearly_discount_percent !== undefined ? Number(prop.yearly_discount_percent) : 25;
+                                const rawYear = price * 365;
+                                const finalYear = Number(prop.price_per_year) || Math.round(rawYear * (1 - yDisc / 100));
+                                return (
+                                  <div>
+                                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                                      <span className="text-xs text-gray-400 line-through font-medium">
+                                        IDR {formatRupiah(rawYear).replace('Rp ', '')}
+                                      </span>
+                                      {yDisc > 0 && (
+                                        <span className="text-[11px] font-bold text-emerald-600">
+                                          {yDisc}% OFF
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-lg sm:text-xl font-black text-red-500 tracking-tight">
+                                      IDR {formatRupiah(finalYear).replace('Rp ', '')} <span className="text-xs font-semibold text-gray-400">/ tahun</span>
+                                    </p>
+                                  </div>
+                                );
+                              })()
+                            ) : hasDiscount ? (
                               <div>
                                 <div className="flex items-center justify-end gap-1.5 mb-0.5">
                                   <span className="text-xs text-gray-400 line-through font-medium">

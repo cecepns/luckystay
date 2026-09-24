@@ -3,7 +3,35 @@
  * Rule: All endpoints MUST be defined here, never hardcode in components/pages!
  */
 
+export const getUploadUrl = (path) => {
+  if (!path) return '';
+  if (typeof path !== 'string') return '';
+  const trimmed = path.trim();
+  if (
+    !trimmed || 
+    trimmed === '[object Object]' || 
+    trimmed.toLowerCase() === 'null' || 
+    trimmed.toLowerCase() === 'undefined'
+  ) {
+    return '';
+  }
+  if (
+    trimmed.startsWith('http://') || 
+    trimmed.startsWith('https://') || 
+    trimmed.startsWith('data:') || 
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.kingcreativestudio.my.id/luckystay/api';
+  const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+  return `${baseUrl}${cleanPath}`;
+};
+
 export const API_ENDPOINTS = {
+  UPLOADS: getUploadUrl,
+
   AUTH: {
     LOGIN: "/auth/login",
     REGISTER: "/auth/register",
@@ -24,6 +52,8 @@ export const API_ENDPOINTS = {
 
   BOOKINGS: {
     LIST: "/bookings",
+    TIMELINE: "/bookings/timeline",
+    ADMIN_CREATE: "/bookings/admin",
     DETAIL: (identifier) => `/bookings/${identifier}`,
     CREATE: "/bookings",
     UPDATE: (id) => `/bookings/${id}`,

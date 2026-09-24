@@ -34,21 +34,9 @@ export const calculateNights = (checkIn, checkOut) => {
   return days > 0 ? days : 1;
 };
 
+import { getUploadUrl } from './endpoints';
+
 export const getImageUrl = (path) => {
-  if (!path) return '';
-  if (typeof path !== 'string') return '';
-  const trimmed = path.trim();
-  if (!trimmed || trimmed === '[object Object]' || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') {
-    return '';
-  }
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
-    return trimmed;
-  }
-  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.kingcreativestudio.my.id/luckystay/api';
-  if (apiUrl && !cleanPath.startsWith('http')) {
-    return `${apiUrl.replace(/\/api\/?$/, '')}${cleanPath}`;
-  }
-  return cleanPath;
+  return getUploadUrl(path);
 };
 

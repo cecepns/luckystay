@@ -4,7 +4,7 @@ import { MapPin, Bed, ChevronLeft, ChevronRight, Percent } from 'lucide-react';
 import { formatRupiah } from '../utils/formatters';
 import ImageWithFallback from './ImageWithFallback';
 
-export default function ApartmentCard({ property }) {
+export default function ApartmentCard({ property, duration = 'Harian' }) {
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
   const images = property.images && property.images.length > 0
@@ -24,7 +24,7 @@ export default function ApartmentCard({ property }) {
   };
 
   // Discount calculation
-  const price = Number(property.price_per_night);
+  const price = Number(property.price_per_night) || 0;
   let originalPrice = property.original_price ? Number(property.original_price) : null;
   let discountPercent = property.discount_percent ? Number(property.discount_percent) : 0;
 
@@ -35,6 +35,13 @@ export default function ApartmentCard({ property }) {
   }
 
   const hasDiscount = discountPercent > 0 && originalPrice && originalPrice > price;
+
+  // Monthly & Yearly calculations
+  const monthlyDisc = property.monthly_discount_percent !== undefined ? Number(property.monthly_discount_percent) : 15;
+  const priceMonthly = Number(property.price_per_month) || Math.round(price * 30 * (1 - monthlyDisc / 100));
+
+  const yearlyDisc = property.yearly_discount_percent !== undefined ? Number(property.yearly_discount_percent) : 25;
+  const priceYearly = Number(property.price_per_year) || Math.round(price * 365 * (1 - yearlyDisc / 100));
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full relative">
@@ -90,8 +97,18 @@ export default function ApartmentCard({ property }) {
 
         {/* Bottom Overlapping Badges (Discount Ribbon + Room Type Pill) - OUTSIDE clipped image container */}
         <div className="absolute -bottom-3.5 left-0 right-0 px-3 flex items-center justify-between pointer-events-none z-20">
-          {/* Left Ribbon: Hemat X% */}
-          {hasDiscount ? (
+          {/* Left Ribbon */}
+          {duration === 'Bulanan' && monthlyDisc > 0 ? (
+            <div className="flex items-center gap-1.5 bg-[#d93a3a] text-white text-[11px] font-extrabold px-3 py-1.5 rounded-md shadow-md">
+              <Percent className="w-3 h-3 stroke-[2.5]" />
+              <span>Hemat {monthlyDisc}%</span>
+            </div>
+          ) : duration === 'Tahunan' && yearlyDisc > 0 ? (
+            <div className="flex items-center gap-1.5 bg-[#d93a3a] text-white text-[11px] font-extrabold px-3 py-1.5 rounded-md shadow-md">
+              <Percent className="w-3 h-3 stroke-[2.5]" />
+              <span>Hemat {yearlyDisc}%</span>
+            </div>
+          ) : hasDiscount ? (
             <div className="flex items-center gap-1.5 bg-[#d93a3a] text-white text-[11px] font-extrabold px-3 py-1.5 rounded-md shadow-md">
               <Percent className="w-3 h-3 stroke-[2.5]" />
               <span>Hemat {discountPercent}%</span>
@@ -124,7 +141,49 @@ export default function ApartmentCard({ property }) {
 
         {/* Pricing Area */}
         <div className="mt-1">
-          {hasDiscount ? (
+          {duration === 'Bulanan' ? (
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs text-gray-400 line-through font-medium">
+                  IDR {formatRupiah(price * 30).replace('Rp ', '')}
+                </span>
+                {monthlyDisc > 0 && (
+                  <span className="text-xs font-bold text-emerald-600">
+                    {monthlyDisc}% OFF
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg sm:text-xl font-black text-red-500 tracking-tight">
+                  IDR {formatRupiah(priceMonthly).replace('Rp ', '')}
+                </span>
+                <span className="text-xs font-semibold text-gray-400">
+                  / bulan
+                </span>
+              </div>
+            </div>
+          ) : duration === 'Tahunan' ? (
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs text-gray-400 line-through font-medium">
+                  IDR {formatRupiah(price * 365).replace('Rp ', '')}
+                </span>
+                {yearlyDisc > 0 && (
+                  <span className="text-xs font-bold text-emerald-600">
+                    {yearlyDisc}% OFF
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg sm:text-xl font-black text-red-500 tracking-tight">
+                  IDR {formatRupiah(priceYearly).replace('Rp ', '')}
+                </span>
+                <span className="text-xs font-semibold text-gray-400">
+                  / tahun
+                </span>
+              </div>
+            </div>
+          ) : hasDiscount ? (
             <div>
               {/* Normal Strikethrough Price + Discount Tag */}
               <div className="flex items-center gap-2 mb-0.5">
@@ -142,7 +201,7 @@ export default function ApartmentCard({ property }) {
                   IDR {formatRupiah(price).replace('Rp ', '')}
                 </span>
                 <span className="text-xs font-semibold text-gray-400">
-                  / Bulan
+                  / malam
                 </span>
               </div>
             </div>

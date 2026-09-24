@@ -34,7 +34,14 @@ export default function StatusBadge({ status, type = 'payment' }) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-          Terkonfirmasi (Lunas)
+          Lunas (Terkonfirmasi)
+        </span>
+      );
+    case 'dp_paid':
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+          <Clock className="w-3 h-3 text-amber-600" />
+          Sudah DP (Down Payment)
         </span>
       );
     case 'waiting_approval':

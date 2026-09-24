@@ -110,7 +110,33 @@ export default function ApartmentDetailPage() {
 
   const propertyPrice = Number(property.price_per_night) || 0;
   const nights = calculateNights(checkInDate, checkOutDate);
-  const totalRoomPrice = propertyPrice * nights;
+  const rawRoomPrice = propertyPrice * nights;
+
+  let rentalType = 'daily';
+  let totalRoomPrice = rawRoomPrice;
+  let discountAmount = 0;
+  let discountLabel = '';
+
+  if (nights >= 365) {
+    rentalType = 'yearly';
+    const yearlyDisc = property.yearly_discount_percent !== undefined ? Number(property.yearly_discount_percent) : 25;
+    const yearlyRate = Number(property.price_per_year) || Math.round(propertyPrice * 365 * (1 - yearlyDisc / 100));
+    const fullYears = Math.floor(nights / 365);
+    const remDays = nights % 365;
+    totalRoomPrice = (fullYears * yearlyRate) + Math.round(remDays * (yearlyRate / 365));
+    discountAmount = Math.max(0, rawRoomPrice - totalRoomPrice);
+    discountLabel = `Diskon Sewa Tahunan (${yearlyDisc}%)`;
+  } else if (nights >= 30) {
+    rentalType = 'monthly';
+    const monthlyDisc = property.monthly_discount_percent !== undefined ? Number(property.monthly_discount_percent) : 15;
+    const monthlyRate = Number(property.price_per_month) || Math.round(propertyPrice * 30 * (1 - monthlyDisc / 100));
+    const fullMonths = Math.floor(nights / 30);
+    const remDays = nights % 30;
+    totalRoomPrice = (fullMonths * monthlyRate) + Math.round(remDays * (monthlyRate / 30));
+    discountAmount = Math.max(0, rawRoomPrice - totalRoomPrice);
+    discountLabel = `Diskon Sewa Bulanan (${monthlyDisc}%)`;
+  }
+
   const cleaningFee = Number(property.cleaning_fee) || 0;
   const deposit = Number(property.security_deposit) || 0;
   const grandTotal = totalRoomPrice + cleaningFee + deposit;
@@ -145,6 +171,10 @@ export default function ApartmentDetailPage() {
         checkOutDate,
         nights,
         guestsCount,
+        rentalType,
+        rawRoomPrice,
+        discountAmount,
+        discountLabel,
         totalRoomPrice,
         cleaningFee,
         deposit,
@@ -542,8 +572,24 @@ export default function ApartmentDetailPage() {
               <div className="space-y-2.5 pt-2 border-t border-gray-100 text-xs">
                 <div className="flex justify-between text-gray-600">
                   <span>{formatRupiah(property.price_per_night)} × {nights} Malam</span>
-                  <span className="font-semibold text-gray-800">{formatRupiah(totalRoomPrice)}</span>
+                  <span className={`font-semibold ${discountAmount > 0 ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                    {formatRupiah(rawRoomPrice)}
+                  </span>
                 </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                    <span>{discountLabel}</span>
+                    <span>- {formatRupiah(discountAmount)}</span>
+                  </div>
+                )}
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-gray-700 font-semibold">
+                    <span>Tarif Bersih Kamar</span>
+                    <span className="text-orange-600 font-bold">{formatRupiah(totalRoomPrice)}</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between text-gray-600">
                   <span>Biaya Kebersihan (Cleaning Fee)</span>

@@ -4,6 +4,7 @@ import AdminLayout from '../../components/AdminLayout';
 import Pagination from '../../components/Pagination';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
+import MonthlyGanttTimeline from '../../components/MonthlyGanttTimeline';
 import { TableRowSkeleton, EmptyState } from '../../components/Skeleton';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -23,12 +24,22 @@ import {
   Sparkles,
   AlertCircle,
   Edit3,
-  Trash2
+  Trash2,
+  Plus,
+  Table as TableIcon,
+  Calendar,
+  DollarSign,
+  Home
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ImageWithFallback from '../../components/ImageWithFallback';
+import Select from 'react-select';
 
 export default function AdminBookingsPage() {
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' (default) | 'table'
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
+  const [propertiesList, setPropertiesList] = useState([]);
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,15 +69,37 @@ export default function AdminBookingsPage() {
     guest_email: '',
     guest_phone: '',
     number_of_guests: 1,
+    rental_type: 'harian',
     check_in_date: '',
     check_out_date: '',
     payment_status: 'pending_payment',
+    down_payment_amount: 0,
     payment_method: 'bank_transfer',
     special_requests: '',
     admin_notes: '',
     grand_total: ''
   });
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+  // Create Booking Modal State ("Input Sewa Baru")
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    property_id: '',
+    rental_type: 'harian',
+    guest_name: '',
+    guest_email: '',
+    guest_phone: '',
+    number_of_guests: 1,
+    check_in_date: '',
+    check_out_date: '',
+    payment_status: 'pending_payment',
+    down_payment_amount: 0,
+    payment_method: 'bank_transfer',
+    grand_total: 0,
+    special_requests: '',
+    admin_notes: ''
+  });
 
   const fetchBookings = async (page = pagination.page, limit = pagination.limit) => {
     setLoading(true);
@@ -91,9 +124,132 @@ export default function AdminBookingsPage() {
     }
   };
 
+  // Fetch properties for Direct Booking create form
+  const fetchProperties = async () => {
+    try {
+      const res = await request.get(API_ENDPOINTS.PROPERTIES.LIST, { limit: 100 });
+      if (res.success && res.data) {
+        setPropertiesList(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load properties for booking form:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProperties();
+  }, []);
+
   useEffect(() => {
     fetchBookings(1, pagination.limit);
   }, [debouncedSearch, statusFilter]);
+
+  // Calculate price helper for direct admin booking
+  const calculateBookingPrice = (propertyId, checkIn, checkOut, type) => {
+    if (!propertyId || !checkIn || !checkOut) return 0;
+    const prop = propertiesList.find(p => String(p.id) === String(propertyId));
+    if (!prop) return 0;
+
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffTime = end - start;
+    const nights = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+
+    if (type === 'tahunan') {
+      if (Number(prop.price_per_year) > 0) {
+        const years = Math.max(1, nights / 365);
+        return Math.round(Number(prop.price_per_year) * years);
+      }
+      const dailyPrice = Number(prop.final_price || prop.price_per_night || 0);
+      const disc = Number(prop.yearly_discount_percent !== undefined ? prop.yearly_discount_percent : 25);
+      return Math.round(dailyPrice * nights * (1 - disc / 100));
+    } else if (type === 'bulanan') {
+      if (Number(prop.price_per_month) > 0) {
+        const months = Math.max(1, nights / 30);
+        return Math.round(Number(prop.price_per_month) * months);
+      }
+      const dailyPrice = Number(prop.final_price || prop.price_per_night || 0);
+      const disc = Number(prop.monthly_discount_percent !== undefined ? prop.monthly_discount_percent : 15);
+      return Math.round(dailyPrice * nights * (1 - disc / 100));
+    } else {
+      const dailyPrice = Number(prop.final_price || prop.price_per_night || 0);
+      return Math.round(dailyPrice * nights);
+    }
+  };
+
+  // Open Create Booking Modal ("Input Sewa Baru")
+  const handleOpenCreateModal = (initialData = {}) => {
+    const propId = initialData.property_id || (propertiesList[0]?.id || '');
+    const checkIn = initialData.check_in_date || new Date().toISOString().slice(0, 10);
+    let checkOut = initialData.check_out_date;
+    if (!checkOut) {
+      const d = new Date(checkIn);
+      d.setDate(d.getDate() + 1);
+      checkOut = d.toISOString().slice(0, 10);
+    }
+    const rentalType = initialData.rental_type || 'harian';
+    const total = calculateBookingPrice(propId, checkIn, checkOut, rentalType);
+
+    setCreateFormData({
+      property_id: propId,
+      rental_type: rentalType,
+      guest_name: initialData.guest_name || '',
+      guest_email: initialData.guest_email || '',
+      guest_phone: initialData.guest_phone || '',
+      number_of_guests: 1,
+      check_in_date: checkIn,
+      check_out_date: checkOut,
+      payment_status: initialData.payment_status || 'pending_payment',
+      down_payment_amount: 0,
+      payment_method: 'bank_transfer',
+      grand_total: total,
+      special_requests: '',
+      admin_notes: ''
+    });
+    setShowCreateModal(true);
+  };
+
+  // Handle Create Booking Submit
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    if (!createFormData.property_id) {
+      toast.error('Pilih unit properti!');
+      return;
+    }
+    if (!createFormData.guest_name.trim() || !createFormData.guest_phone.trim()) {
+      toast.error('Nama dan nomor WhatsApp tamu wajib diisi!');
+      return;
+    }
+    if (!createFormData.check_in_date || !createFormData.check_out_date) {
+      toast.error('Tanggal check-in dan check-out wajib diisi!');
+      return;
+    }
+    if (new Date(createFormData.check_out_date) <= new Date(createFormData.check_in_date)) {
+      toast.error('Tanggal check-out harus setelah tanggal check-in!');
+      return;
+    }
+    if (createFormData.payment_status === 'dp_paid' && (!createFormData.down_payment_amount || Number(createFormData.down_payment_amount) <= 0)) {
+      toast.error('Harap masukkan nominal DP untuk status "Sudah DP"!');
+      return;
+    }
+
+    setIsSubmittingCreate(true);
+    try {
+      const res = await request.post(API_ENDPOINTS.BOOKINGS.ADMIN_CREATE, createFormData);
+      if (res.success) {
+        toast.success(`Booking baru berhasil dibuat! (Invoice: ${res.data?.invoice_number || ''})`);
+        setShowCreateModal(false);
+        setTimelineRefreshKey(prev => prev + 1);
+        fetchBookings(pagination.page, pagination.limit);
+      } else {
+        toast.error(res.message || 'Gagal membuat booking');
+      }
+    } catch (err) {
+      toast.error(err.customMessage || 'Gagal membuat booking');
+    } finally {
+      setIsSubmittingCreate(false);
+    }
+  };
 
   // Handle Approve Booking -> Calls Hostex API to sync & close dates!
   const handleApprove = async (booking) => {
@@ -117,6 +273,7 @@ export default function AdminBookingsPage() {
         } else {
           toast.success('Booking disetujui secara lokal! Respon Hostex telah dicatat.');
         }
+        setTimelineRefreshKey(prev => prev + 1);
         fetchBookings(pagination.page, pagination.limit);
         if (showProofModal) setShowProofModal(false);
       } else {
@@ -145,6 +302,7 @@ export default function AdminBookingsPage() {
         toast.success('Booking berhasil ditolak');
         setShowRejectModal(false);
         setRejectReason('');
+        setTimelineRefreshKey(prev => prev + 1);
         fetchBookings(pagination.page, pagination.limit);
       }
     } catch (err) {
@@ -162,6 +320,7 @@ export default function AdminBookingsPage() {
       toast.dismiss(loadingToast);
       if (res.success) {
         toast.success('Sinkronisasi ke Hostex berhasil! Kalender OTA telah tertutup.');
+        setTimelineRefreshKey(prev => prev + 1);
         fetchBookings(pagination.page, pagination.limit);
       } else {
         toast.error('Hostex: ' + (res.message || 'Gagal'));
@@ -180,9 +339,11 @@ export default function AdminBookingsPage() {
       guest_email: booking.guest_email || '',
       guest_phone: booking.guest_phone || '',
       number_of_guests: booking.number_of_guests || 1,
+      rental_type: booking.rental_type || 'harian',
       check_in_date: typeof booking.check_in_date === 'string' ? booking.check_in_date.slice(0, 10) : '',
       check_out_date: typeof booking.check_out_date === 'string' ? booking.check_out_date.slice(0, 10) : '',
       payment_status: booking.payment_status || 'pending_payment',
+      down_payment_amount: booking.down_payment_amount || 0,
       payment_method: booking.payment_method || 'bank_transfer',
       special_requests: booking.special_requests || '',
       admin_notes: booking.admin_notes || '',
@@ -206,6 +367,10 @@ export default function AdminBookingsPage() {
       toast.error('Tanggal check-out harus setelah tanggal check-in!');
       return;
     }
+    if (editFormData.payment_status === 'dp_paid' && (!editFormData.down_payment_amount || Number(editFormData.down_payment_amount) <= 0)) {
+      toast.error('Harap masukkan nominal DP untuk status "Sudah DP"!');
+      return;
+    }
 
     setIsSubmittingEdit(true);
     try {
@@ -213,6 +378,7 @@ export default function AdminBookingsPage() {
       if (res.success) {
         toast.success('Data pemesanan berhasil diperbarui!');
         setShowEditModal(false);
+        setTimelineRefreshKey(prev => prev + 1);
         fetchBookings(pagination.page, pagination.limit);
       } else {
         toast.error(res.message || 'Gagal memperbarui pemesanan');
@@ -251,6 +417,7 @@ export default function AdminBookingsPage() {
                 toast.dismiss(loadingToast);
                 if (res.success) {
                   toast.success(`Pemesanan ${booking.invoice_number} berhasil dihapus!`);
+                  setTimelineRefreshKey(prev => prev + 1);
                   fetchBookings(pagination.page, pagination.limit);
                 } else {
                   toast.error(res.message || 'Gagal menghapus');
@@ -278,241 +445,309 @@ export default function AdminBookingsPage() {
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900">Kelola Pemesanan & Approval</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Verifikasi bukti transfer manual dan otomatis sinkronkan penutupan kalender ke Hostex Channel Manager.
+              Timeline status okupansi unit, verifikasi bukti transfer, dan sinkronisasi otomatis kalender Hostex.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            {/* View Mode Switcher */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setViewMode('timeline')}
+                className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'timeline'
+                    ? 'bg-white text-orange-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">Timeline Bulanan</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white text-orange-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <TableIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">Daftar Tabel ({pagination.total})</span>
+              </button>
+            </div>
+
+            {/* Input Sewa Baru Button */}
             <button
-              onClick={() => fetchBookings(pagination.page, pagination.limit)}
-              className="p-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              title="Refresh Data"
+              type="button"
+              onClick={() => handleOpenCreateModal()}
+              className="flex-1 sm:flex-initial justify-center px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-orange-600/20 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Input Sewa Baru</span>
+            </button>
+
+            {/* Refresh */}
+            <button
+              onClick={() => {
+                setTimelineRefreshKey(prev => prev + 1);
+                fetchBookings(pagination.page, pagination.limit);
+              }}
+              className="p-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Muat Ulang Data"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Muat Ulang</span>
+              <span className="hidden sm:inline">Muat Ulang</span>
             </button>
           </div>
         </div>
 
-        {/* Filter & Realtime Debounced Search Bar */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          
-          {/* Realtime Debounce Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Cari realtime: Nomor invoice, nama tamu, no. HP, properti... (Debounce 350ms)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
-            />
-          </div>
+        {/* View Mode: Timeline Gantt vs Table */}
+        {viewMode === 'timeline' ? (
+          <MonthlyGanttTimeline
+            refreshKey={timelineRefreshKey}
+            onOpenCreateBooking={(initialData) => handleOpenCreateModal(initialData)}
+            onViewBookingDetail={(booking) => {
+              setSelectedBooking(booking);
+              setShowProofModal(true);
+            }}
+            onEditBooking={(booking) => handleOpenEditModal(booking)}
+          />
+        ) : (
+          <>
+            {/* Filter & Realtime Debounced Search Bar */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              
+              {/* Realtime Debounce Search Input */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Cari realtime: Nomor invoice, nama tamu, no. HP, properti... (Debounce 350ms)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                />
+              </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 font-semibold whitespace-nowrap flex items-center gap-1">
-              <Filter className="w-3 h-3" /> Status:
-            </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-            >
-              <option value="all">Semua Status</option>
-              <option value="waiting_approval">Menunggu Approval (Verifikasi)</option>
-              <option value="pending_payment">Menunggu Pembayaran</option>
-              <option value="confirmed">Terkonfirmasi (Lunas)</option>
-              <option value="rejected">Ditolak</option>
-            </select>
-          </div>
+              {/* Status Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 font-semibold whitespace-nowrap flex items-center gap-1">
+                  <Filter className="w-3 h-3" /> Status:
+                </span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                >
+                  <option value="all">Semua Status</option>
+                  <option value="waiting_approval">Menunggu Approval (Verifikasi)</option>
+                  <option value="pending_payment">Menunggu Pembayaran (Belum DP)</option>
+                  <option value="dp_paid">Sudah DP (Down Payment)</option>
+                  <option value="confirmed">Terkonfirmasi (Lunas)</option>
+                  <option value="rejected">Ditolak</option>
+                </select>
+              </div>
 
-        </div>
-
-        {/* Bookings Table */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80 text-gray-500 uppercase tracking-wider font-semibold">
-                  <th className="py-3.5 px-4">Invoice</th>
-                  <th className="py-3.5 px-4">Data Tamu</th>
-                  <th className="py-3.5 px-4">Unit Properti</th>
-                  <th className="py-3.5 px-4">Jadwal Menginap</th>
-                  <th className="py-3.5 px-4">Tagihan</th>
-                  <th className="py-3.5 px-4">Status Bayar</th>
-                  <th className="py-3.5 px-4">Hostex Sync</th>
-                  <th className="py-3.5 px-4 text-center">Aksi Manajemen</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={8} />
-                  ))
-                ) : bookings.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-gray-400">
-                      Tidak ada data booking yang sesuai dengan filter pencarian.
-                    </td>
-                  </tr>
-                ) : (
-                  bookings.map((b) => (
-                    <tr key={b.id} className="hover:bg-gray-50/80 transition-colors">
-                      
-                      {/* Invoice */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-gray-900 block">{b.invoice_number}</span>
-                        <span className="text-[10px] text-gray-400">{formatDateIndo(b.created_at)}</span>
-                      </td>
-
-                      {/* Guest Info */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-gray-800">{b.guest_name}</div>
-                        <div className="text-[11px] text-gray-500">{b.guest_phone}</div>
-                        <div className="text-[10px] text-gray-400">{b.number_of_guests} Tamu</div>
-                      </td>
-
-                      {/* Property */}
-                      <td className="py-3.5 px-4 max-w-[200px]">
-                        <div className="font-semibold text-gray-800 truncate" title={b.property_name}>
-                          {b.property_name}
-                        </div>
-                        <div className="text-[10px] text-gray-400 truncate">{b.property_location}</div>
-                      </td>
-
-                      {/* Dates */}
-                      <td className="py-3.5 px-4 text-gray-600">
-                        <div className="font-medium text-gray-800">{formatDateIndo(b.check_in_date)}</div>
-                        <div className="text-[11px] text-gray-400">s/d {formatDateIndo(b.check_out_date)} ({b.total_nights} mlm)</div>
-                      </td>
-
-                      {/* Grand total */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-orange-600">{formatRupiah(b.grand_total)}</div>
-                        <div className="text-[10px] text-gray-400 capitalize">{b.payment_method.replace('_', ' ')}</div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-3.5 px-4">
-                        <StatusBadge status={b.payment_status} />
-                      </td>
-
-                      {/* Hostex */}
-                      <td className="py-3.5 px-4">
-                        <StatusBadge status={b.hostex_sync_status} type="hostex" />
-                        {b.hostex_reservation_code && (
-                          <div className="font-mono text-[10px] text-gray-500 mt-0.5">{b.hostex_reservation_code}</div>
-                        )}
-                      </td>
-
-                      {/* Action buttons */}
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          
-                          {/* Bukti Transfer Review Button */}
-                          <button
-                            onClick={() => {
-                              setSelectedBooking(b);
-                              setShowProofModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-                            title="Lihat Bukti Transfer & Detail"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {/* Quick Approve (with Hostex Sync) */}
-                          {b.payment_status === 'waiting_approval' && (
-                            <button
-                              onClick={() => handleApprove(b)}
-                              disabled={isProcessing}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors"
-                              title="Setujui & Sync Hostex"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Approve</span>
-                            </button>
-                          )}
-
-                          {/* Quick Reject */}
-                          {b.payment_status === 'waiting_approval' && (
-                            <button
-                              onClick={() => {
-                                setSelectedBooking(b);
-                                setShowRejectModal(true);
-                              }}
-                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
-                              title="Tolak Booking"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-
-                          {/* Hostex Re-sync button if confirmed but sync_failed */}
-                          {b.payment_status === 'confirmed' && b.hostex_sync_status !== 'synced' && (
-                            <button
-                              onClick={() => handleHostexSync(b.id)}
-                              className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-semibold flex items-center gap-1"
-                              title="Coba Sinkronkan Ulang ke Hostex"
-                            >
-                              <RefreshCw className="w-3 h-3" />
-                              <span>Sync Hostex</span>
-                            </button>
-                          )}
-
-                          {/* Invoice Link */}
-                          <Link
-                            to={`/invoice/${b.invoice_number}`}
-                            target="_blank"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                            title="Cetak Invoice Resmi"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Link>
-
-                          {/* Edit Booking Button */}
-                          <button
-                            onClick={() => handleOpenEditModal(b)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
-                            title="Edit Data Pemesanan"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-
-                          {/* Delete Booking Button */}
-                          <button
-                            onClick={() => handleDeleteBooking(b)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="Hapus Pemesanan"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-
-                        </div>
-                      </td>
-
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Reusable Pagination matching AGENTS.md rules */}
-          {!loading && bookings.length > 0 && (
-            <div className="p-4 bg-gray-50/50">
-              <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.total}
-                limit={pagination.limit}
-                onPageChange={(page) => fetchBookings(page, pagination.limit)}
-                onLimitChange={(limit) => fetchBookings(1, limit)}
-              />
             </div>
-          )}
-        </div>
+
+            {/* Bookings Table */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50/80 text-gray-500 uppercase tracking-wider font-semibold">
+                      <th className="py-3.5 px-4">Invoice</th>
+                      <th className="py-3.5 px-4">Data Tamu</th>
+                      <th className="py-3.5 px-4">Unit Properti</th>
+                      <th className="py-3.5 px-4">Jadwal Menginap</th>
+                      <th className="py-3.5 px-4">Tagihan</th>
+                      <th className="py-3.5 px-4">Status Bayar</th>
+                      <th className="py-3.5 px-4">Hostex Sync</th>
+                      <th className="py-3.5 px-4 text-center">Aksi Manajemen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRowSkeleton key={i} cols={8} />
+                      ))
+                    ) : bookings.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-gray-400">
+                          Tidak ada data booking yang sesuai dengan filter pencarian.
+                        </td>
+                      </tr>
+                    ) : (
+                      bookings.map((b) => (
+                        <tr key={b.id} className="hover:bg-gray-50/80 transition-colors">
+                          
+                          {/* Invoice */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono font-bold text-gray-900 block">{b.invoice_number}</span>
+                            <span className="text-[10px] text-gray-400">{formatDateIndo(b.created_at)}</span>
+                          </td>
+
+                          {/* Guest Info */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-800">{b.guest_name}</div>
+                            <div className="text-[11px] text-gray-500">{b.guest_phone}</div>
+                            <div className="text-[10px] text-gray-400">{b.number_of_guests} Tamu</div>
+                          </td>
+
+                          {/* Property */}
+                          <td className="py-3.5 px-4 max-w-[200px]">
+                            <div className="font-semibold text-gray-800 truncate" title={b.property_name}>
+                              {b.property_name}
+                            </div>
+                            <div className="text-[10px] text-gray-400 truncate">{b.property_location}</div>
+                          </td>
+
+                          {/* Dates */}
+                          <td className="py-3.5 px-4 text-gray-600">
+                            <div className="font-medium text-gray-800">{formatDateIndo(b.check_in_date)}</div>
+                            <div className="text-[11px] text-gray-400">s/d {formatDateIndo(b.check_out_date)} ({b.total_nights} mlm)</div>
+                            {b.rental_type && b.rental_type !== 'harian' && (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 capitalize">
+                                Sewa {b.rental_type}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Grand total */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-orange-600">{formatRupiah(b.grand_total)}</div>
+                            {b.payment_status === 'dp_paid' && (
+                              <div className="text-[10px] text-amber-700 font-semibold">
+                                DP: {formatRupiah(b.down_payment_amount || 0)}
+                              </div>
+                            )}
+                            <div className="text-[10px] text-gray-400 capitalize">{b.payment_method?.replace('_', ' ')}</div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4">
+                            <StatusBadge status={b.payment_status} />
+                          </td>
+
+                          {/* Hostex */}
+                          <td className="py-3.5 px-4">
+                            <StatusBadge status={b.hostex_sync_status} type="hostex" />
+                            {b.hostex_reservation_code && (
+                              <div className="font-mono text-[10px] text-gray-500 mt-0.5">{b.hostex_reservation_code}</div>
+                            )}
+                          </td>
+
+                          {/* Action buttons */}
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              
+                              {/* Bukti Transfer Review Button */}
+                              <button
+                                onClick={() => {
+                                  setSelectedBooking(b);
+                                  setShowProofModal(true);
+                                }}
+                                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+                                title="Lihat Bukti Transfer & Detail"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              {/* Quick Approve (with Hostex Sync) */}
+                              {b.payment_status === 'waiting_approval' && (
+                                <button
+                                  onClick={() => handleApprove(b)}
+                                  disabled={isProcessing}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Setujui & Sync Hostex"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approve</span>
+                                </button>
+                              )}
+
+                              {/* Quick Reject */}
+                              {b.payment_status === 'waiting_approval' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedBooking(b);
+                                    setShowRejectModal(true);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
+                                  title="Tolak Booking"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Hostex Re-sync button if confirmed but sync_failed */}
+                              {b.payment_status === 'confirmed' && b.hostex_sync_status !== 'synced' && (
+                                <button
+                                  onClick={() => handleHostexSync(b.id)}
+                                  className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                                  title="Coba Sinkronkan Ulang ke Hostex"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>Sync Hostex</span>
+                                </button>
+                              )}
+
+                              {/* Invoice Link */}
+                              <Link
+                                to={`/invoice/${b.invoice_number}`}
+                                target="_blank"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                                title="Cetak Invoice Resmi"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Link>
+
+                              {/* Edit Booking Button */}
+                              <button
+                                onClick={() => handleOpenEditModal(b)}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
+                                title="Edit Data Pemesanan"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+
+                              {/* Delete Booking Button */}
+                              <button
+                                onClick={() => handleDeleteBooking(b)}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Hapus Pemesanan"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+
+                            </div>
+                          </td>
+
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Reusable Pagination matching AGENTS.md rules */}
+              {!loading && bookings.length > 0 && (
+                <div className="p-4 bg-gray-50/50">
+                  <Pagination
+                    currentPage={pagination.page}
+                    totalPages={pagination.totalPages}
+                    totalItems={pagination.total}
+                    limit={pagination.limit}
+                    onPageChange={(page) => fetchBookings(page, pagination.limit)}
+                    onLimitChange={(limit) => fetchBookings(1, limit)}
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* MODAL: BUKTI TRANSFER & REVIEW DETAIL */}
         <Modal
@@ -747,6 +982,22 @@ export default function AdminBookingsPage() {
               </div>
             </div>
 
+            {/* Tipe Sewa */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Tipe Sewa Unit
+              </label>
+              <select
+                value={editFormData.rental_type}
+                onChange={(e) => setEditFormData({ ...editFormData, rental_type: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium capitalize"
+              >
+                <option value="harian">Sewa Harian</option>
+                <option value="bulanan">Sewa Bulanan</option>
+                <option value="tahunan">Sewa Tahunan</option>
+              </select>
+            </div>
+
             {/* Status & Metode Pembayaran */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -758,9 +1009,10 @@ export default function AdminBookingsPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, payment_status: e.target.value })}
                   className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
                 >
-                  <option value="pending_payment">Menunggu Pembayaran</option>
+                  <option value="pending_payment">🔴 Menunggu Pembayaran (Belum DP)</option>
+                  <option value="dp_paid">🟡 Sudah DP (Down Payment)</option>
                   <option value="waiting_approval">Menunggu Verifikasi (Bukti Diunggah)</option>
-                  <option value="confirmed">Dikonfirmasi (Lunas)</option>
+                  <option value="confirmed">🟢 Dikonfirmasi (Lunas)</option>
                   <option value="completed">Selesai (Checkout)</option>
                   <option value="rejected">Ditolak</option>
                   <option value="cancelled">Dibatalkan</option>
@@ -782,6 +1034,30 @@ export default function AdminBookingsPage() {
                 </select>
               </div>
             </div>
+
+            {/* Input DP jika status dp_paid */}
+            {editFormData.payment_status === 'dp_paid' && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
+                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1">
+                  Nominal Uang Muka / DP yang Diterima (Rp) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editFormData.down_payment_amount}
+                  onChange={(e) => setEditFormData({ ...editFormData, down_payment_amount: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-amber-300 rounded-xl font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono"
+                  placeholder="Contoh: 1000000"
+                />
+                {Number(editFormData.grand_total) > 0 && (
+                  <div className="text-[11px] text-amber-800 font-medium mt-1.5 flex justify-between">
+                    <span>Sisa Pelunasan:</span>
+                    <strong className="font-bold">{formatRupiah(Math.max(0, Number(editFormData.grand_total) - Number(editFormData.down_payment_amount || 0)))}</strong>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Grand Total */}
             <div>
@@ -840,6 +1116,426 @@ export default function AdminBookingsPage() {
                 {isSubmittingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </div>
+          </form>
+        </Modal>
+
+        {/* MODAL: INPUT SEWA BARU (DIRECT BOOKING) */}
+        <Modal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          title="Input Sewa Unit Baru (Direct Booking)"
+          maxWidth="max-w-2xl"
+        >
+          <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+            
+            {/* Unit Selection with React Select */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  Pilih Unit Properti <span className="text-red-500">*</span>
+                </label>
+                {createFormData.property_id && (
+                  <span className="text-[10px] text-orange-600 font-semibold">
+                    ID #{createFormData.property_id}
+                  </span>
+                )}
+              </div>
+              <Select
+                options={propertiesList.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} ${p.unit_number ? `(No. ${p.unit_number})` : ''} - ${p.building_name || p.city}`,
+                  property: p
+                }))}
+                value={
+                  createFormData.property_id
+                    ? (() => {
+                        const prop = propertiesList.find((p) => String(p.id) === String(createFormData.property_id));
+                        return prop
+                          ? {
+                              value: prop.id,
+                              label: `${prop.name} ${prop.unit_number ? `(No. ${prop.unit_number})` : ''} - ${prop.building_name || prop.city}`,
+                              property: prop
+                            }
+                          : null;
+                      })()
+                    : null
+                }
+                onChange={(selected) => {
+                  const newPropId = selected ? selected.value : '';
+                  const newTotal = calculateBookingPrice(
+                    newPropId,
+                    createFormData.check_in_date,
+                    createFormData.check_out_date,
+                    createFormData.rental_type
+                  );
+                  setCreateFormData({
+                    ...createFormData,
+                    property_id: newPropId,
+                    grand_total: newTotal
+                  });
+                }}
+                placeholder="-- Ketik & Cari Unit Apartemen / Villa --"
+                isSearchable
+                isClearable
+                noOptionsMessage={() => "Unit properti tidak ditemukan"}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                menuPosition="fixed"
+                styles={{
+                  menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+                  control: (base, state) => ({
+                    ...base,
+                    backgroundColor: '#f9fafb',
+                    borderColor: state.isFocused ? '#f97316' : '#e5e7eb',
+                    borderRadius: '0.75rem',
+                    padding: '2px',
+                    fontSize: '0.75rem',
+                    boxShadow: state.isFocused ? '0 0 0 2px rgba(249, 115, 22, 0.2)' : 'none',
+                    '&:hover': {
+                      borderColor: '#f97316'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                    zIndex: 99999
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isSelected 
+                      ? '#ea580c' 
+                      : state.isFocused 
+                        ? '#fff7ed' 
+                        : 'white',
+                    color: state.isSelected ? 'white' : '#1f2937',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    padding: '8px 12px'
+                  })
+                }}
+                formatOptionLabel={(option) => {
+                  const p = option.property;
+                  if (!p) return option.label;
+                  return (
+                    <div className="flex items-center gap-2.5 py-0.5">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                        <ImageWithFallback
+                          src={p.images?.[0]}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                          icon={Home}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate text-xs text-gray-900">
+                          {p.name} {p.unit_number ? <span className="text-orange-600 font-semibold">• No. {p.unit_number}</span> : ''}
+                        </div>
+                        <div className="text-[10px] text-gray-500 truncate flex items-center gap-1.5">
+                          <span className="font-medium text-gray-600">{p.building_name || p.city}</span>
+                          <span>•</span>
+                          <span className="font-bold text-orange-600">{formatRupiah(p.final_price || p.price_per_night)}/mlm</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+            </div>
+
+            {/* Skema Rental Type */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                Skema Durasi Sewa
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'harian', label: 'Harian' },
+                  { id: 'bulanan', label: 'Bulanan' },
+                  { id: 'tahunan', label: 'Tahunan' }
+                ].map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => {
+                      const newTotal = calculateBookingPrice(createFormData.property_id, createFormData.check_in_date, createFormData.check_out_date, type.id);
+                      setCreateFormData({
+                        ...createFormData,
+                        rental_type: type.id,
+                        grand_total: newTotal
+                      });
+                    }}
+                    className={`py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                      createFormData.rental_type === type.id
+                        ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-xs'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Sewa {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tamu Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Nama Tamu <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Budi Santoso"
+                  value={createFormData.guest_name}
+                  onChange={(e) => setCreateFormData({ ...createFormData, guest_name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Nomor WhatsApp / HP <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: 081234567890"
+                  value={createFormData.guest_phone}
+                  onChange={(e) => setCreateFormData({ ...createFormData, guest_phone: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Email Tamu (Opsional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={createFormData.guest_email}
+                  onChange={(e) => setCreateFormData({ ...createFormData, guest_email: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Jumlah Tamu
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={createFormData.number_of_guests}
+                  onChange={(e) => setCreateFormData({ ...createFormData, number_of_guests: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Tanggal Reservasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+              <div>
+                <label className="block text-xs font-bold text-orange-950 uppercase tracking-wider mb-1">
+                  Tanggal Check-in <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={createFormData.check_in_date}
+                  onChange={(e) => {
+                    const newCheckIn = e.target.value;
+                    const newTotal = calculateBookingPrice(createFormData.property_id, newCheckIn, createFormData.check_out_date, createFormData.rental_type);
+                    setCreateFormData({
+                      ...createFormData,
+                      check_in_date: newCheckIn,
+                      grand_total: newTotal
+                    });
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-orange-950 uppercase tracking-wider mb-1">
+                  Tanggal Check-out <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={createFormData.check_out_date}
+                  onChange={(e) => {
+                    const newCheckOut = e.target.value;
+                    const newTotal = calculateBookingPrice(createFormData.property_id, createFormData.check_in_date, newCheckOut, createFormData.rental_type);
+                    setCreateFormData({
+                      ...createFormData,
+                      check_out_date: newCheckOut,
+                      grand_total: newTotal
+                    });
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-semibold"
+                />
+              </div>
+            </div>
+
+            {/* Status Pembayaran (Balok Merah, Kuning, Hijau) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1.5">
+                Status Pembayaran (Warna Balok Timeline)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  {
+                    status: 'pending_payment',
+                    color: 'border-rose-400 bg-rose-50 text-rose-800',
+                    dot: 'bg-rose-500',
+                    title: '🔴 Belum DP',
+                    desc: 'Balok Merah'
+                  },
+                  {
+                    status: 'dp_paid',
+                    color: 'border-amber-400 bg-amber-50 text-amber-900',
+                    dot: 'bg-amber-500',
+                    title: '🟡 Sudah DP',
+                    desc: 'Balok Kuning'
+                  },
+                  {
+                    status: 'confirmed',
+                    color: 'border-emerald-400 bg-emerald-50 text-emerald-800',
+                    dot: 'bg-emerald-500',
+                    title: '🟢 Lunas',
+                    desc: 'Balok Hijau'
+                  }
+                ].map((item) => (
+                  <button
+                    key={item.status}
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, payment_status: item.status })}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      createFormData.payment_status === item.status
+                        ? `${item.color} ring-2 ring-orange-500/30 font-bold shadow-xs`
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
+                      <span>{item.title}</span>
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-0.5 ml-4">{item.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nominal DP Input if dp_paid */}
+            {createFormData.payment_status === 'dp_paid' && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                <label className="block text-xs font-bold text-amber-950 uppercase tracking-wider">
+                  Nominal DP yang Diterima (Rp) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Contoh: 500000"
+                  value={createFormData.down_payment_amount}
+                  onChange={(e) => setCreateFormData({ ...createFormData, down_payment_amount: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-white border border-amber-300 rounded-xl font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono"
+                />
+                {Number(createFormData.grand_total) > 0 && (
+                  <div className="text-[11px] text-amber-800 font-medium flex justify-between pt-1 border-t border-amber-200/60">
+                    <span>Sisa Pelunasan:</span>
+                    <strong className="font-bold">
+                      {formatRupiah(Math.max(0, Number(createFormData.grand_total) - Number(createFormData.down_payment_amount || 0)))}
+                    </strong>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Metode Pembayaran & Total Tagihan */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Metode Pembayaran
+                </label>
+                <select
+                  value={createFormData.payment_method}
+                  onChange={(e) => setCreateFormData({ ...createFormData, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                >
+                  <option value="bank_transfer">Transfer Bank Manual</option>
+                  <option value="qris">QRIS Digital</option>
+                  <option value="cash">Bayar di Tempat (Cash)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                    Total Tarif (Rp) <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const recalculated = calculateBookingPrice(
+                        createFormData.property_id,
+                        createFormData.check_in_date,
+                        createFormData.check_out_date,
+                        createFormData.rental_type
+                      );
+                      setCreateFormData({ ...createFormData, grand_total: recalculated });
+                      toast.success(`Dihitung otomatis: ${formatRupiah(recalculated)}`);
+                    }}
+                    className="text-[10px] text-orange-600 hover:text-orange-700 font-bold underline cursor-pointer"
+                  >
+                    Hitung Ulang
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={createFormData.grand_total}
+                  onChange={(e) => setCreateFormData({ ...createFormData, grand_total: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Catatan Internal Admin / Permintaan Khusus
+              </label>
+              <textarea
+                rows={2}
+                value={createFormData.admin_notes}
+                onChange={(e) => setCreateFormData({ ...createFormData, admin_notes: e.target.value })}
+                placeholder="Catatan admin (misal: reservasi via WhatsApp, sewa bulanan khusus, dll)..."
+                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingCreate}
+                className="px-5 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isSubmittingCreate ? 'Menyimpan...' : '+ Buat Booking Unit'}
+              </button>
+            </div>
+
           </form>
         </Modal>
 
