@@ -40,3 +40,37 @@ export const getImageUrl = (path) => {
   return getUploadUrl(path);
 };
 
+/**
+ * Robustly converts any date input (YYYY-MM-DD, ISO string, Date object)
+ * into a local YYYY-MM-DD string without UTC timezone shift.
+ */
+export const formatLocalDateString = (val) => {
+  if (!val) return '';
+  // If it's already a clean YYYY-MM-DD string, return as-is
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim())) {
+    return val.trim();
+  }
+  const d = new Date(val);
+  if (isNaN(d.getTime())) {
+    return typeof val === 'string' ? val.slice(0, 10) : '';
+  }
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Returns the next consecutive calendar day in YYYY-MM-DD format
+ */
+export const getNextLocalDateString = (dateString) => {
+  if (!dateString) return '';
+  const clean = formatLocalDateString(dateString);
+  const [y, m, d] = clean.split('-').map(Number);
+  const nextDate = new Date(y, m - 1, d + 1);
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nextDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+

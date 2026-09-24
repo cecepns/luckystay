@@ -17,11 +17,19 @@ import {
   Edit3,
   CalendarCheck,
   Building,
-  Info
+  Info,
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { request } from '../utils/request';
 import { API_ENDPOINTS, getUploadUrl } from '../utils/endpoints';
-import { formatRupiah, formatDateIndo } from '../utils/formatters';
+import { 
+  formatRupiah, 
+  formatDateIndo, 
+  formatLocalDateString, 
+  getNextLocalDateString,
+  getImageUrl
+} from '../utils/formatters';
 import ImageWithFallback from './ImageWithFallback';
 import toast from 'react-hot-toast';
 
@@ -135,8 +143,8 @@ export default function MonthlyGanttTimeline({
   const getBookingForDate = (propertyId, dateString) => {
     return timelineData.bookings.find(b => {
       if (b.property_id !== propertyId) return false;
-      const checkIn = typeof b.check_in_date === 'string' ? b.check_in_date.slice(0, 10) : new Date(b.check_in_date).toISOString().slice(0, 10);
-      const checkOut = typeof b.check_out_date === 'string' ? b.check_out_date.slice(0, 10) : new Date(b.check_out_date).toISOString().slice(0, 10);
+      const checkIn = formatLocalDateString(b.check_in_date);
+      const checkOut = formatLocalDateString(b.check_out_date);
       return dateString >= checkIn && dateString < checkOut;
     });
   };
@@ -144,24 +152,19 @@ export default function MonthlyGanttTimeline({
   // Check if date is the start/check-in day of this booking
   const isCheckInDay = (booking, dateString) => {
     if (!booking) return false;
-    const checkIn = typeof booking.check_in_date === 'string' ? booking.check_in_date.slice(0, 10) : new Date(booking.check_in_date).toISOString().slice(0, 10);
+    const checkIn = formatLocalDateString(booking.check_in_date);
     return dateString === checkIn;
   };
 
   // Check if date is the day before check-out day of this booking
   const isLastStayDay = (booking, dateString) => {
     if (!booking) return false;
-    const checkOut = typeof booking.check_out_date === 'string' ? booking.check_out_date.slice(0, 10) : new Date(booking.check_out_date).toISOString().slice(0, 10);
-    const dateObj = new Date(dateString);
-    dateObj.setDate(dateObj.getDate() + 1);
-    const nextDayString = dateObj.toISOString().slice(0, 10);
+    const checkOut = formatLocalDateString(booking.check_out_date);
+    const nextDayString = getNextLocalDateString(dateString);
     return nextDayString === checkOut;
   };
 
-  // Determine block color based on client specification:
-  // - Balok Merah: status Booking, belum DP (pending_payment, waiting_approval)
-  // - Balok Kuning: booking dan sudah DP (dp_paid)
-  // - Balok Hijau: lunas (confirmed, completed)
+  // Determine block color matching table status: Belum Lunas vs Lunas
   const getBlockColorStyles = (booking) => {
     if (!booking) return '';
     const status = booking.payment_status;
@@ -171,25 +174,16 @@ export default function MonthlyGanttTimeline({
         text: 'text-white',
         border: 'border-emerald-600',
         pillBg: 'bg-emerald-100 text-emerald-800',
-        statusLabel: 'Lunas (Terkonfirmasi)'
+        statusLabel: 'Lunas'
       };
     }
-    if (status === 'dp_paid') {
-      return {
-        bg: 'bg-amber-400 hover:bg-amber-500',
-        text: 'text-amber-950 font-bold',
-        border: 'border-amber-500',
-        pillBg: 'bg-amber-100 text-amber-900',
-        statusLabel: 'Sudah DP (Down Payment)'
-      };
-    }
-    // pending_payment, waiting_approval, or other non-DP
+    // pending_payment, waiting_approval, dp_paid, etc.
     return {
-      bg: 'bg-rose-500 hover:bg-rose-600',
+      bg: 'bg-amber-500 hover:bg-amber-600',
       text: 'text-white',
-      border: 'border-rose-600',
-      pillBg: 'bg-rose-100 text-rose-800',
-      statusLabel: 'Booking (Belum DP)'
+      border: 'border-amber-600',
+      pillBg: 'bg-amber-100 text-amber-900',
+      statusLabel: 'Belum Lunas'
     };
   };
 
@@ -303,35 +297,6 @@ export default function MonthlyGanttTimeline({
 
       </div>
 
-      {/* 2. Color Legend Bar matching requirements */}
-      <div className="px-4 py-2 bg-white border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 text-[11px]">
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="font-bold text-gray-500 flex items-center gap-1">
-            <Info className="w-3.5 h-3.5 text-gray-400" />
-            Keterangan Warna:
-          </span>
-          <div className="flex items-center gap-1.5 font-medium text-gray-700">
-            <span className="w-3.5 h-3.5 rounded bg-rose-500 shadow-xs inline-block"></span>
-            <span>Balok Merah: <strong>Booking (Belum DP)</strong></span>
-          </div>
-          <div className="flex items-center gap-1.5 font-medium text-gray-700">
-            <span className="w-3.5 h-3.5 rounded bg-amber-400 shadow-xs inline-block"></span>
-            <span>Balok Kuning: <strong>Booking (Sudah DP)</strong></span>
-          </div>
-          <div className="flex items-center gap-1.5 font-medium text-gray-700">
-            <span className="w-3.5 h-3.5 rounded bg-emerald-500 shadow-xs inline-block"></span>
-            <span>Balok Hijau: <strong>Lunas</strong></span>
-          </div>
-          <div className="flex items-center gap-1.5 font-medium text-gray-600">
-            <span className="w-3.5 h-3.5 rounded bg-white border-2 border-gray-300 shadow-xs inline-block"></span>
-            <span>Area Putih: <strong>Tersedia (Klik untuk sewa baru)</strong></span>
-          </div>
-        </div>
-
-        <div className="text-[10px] text-gray-400 italic hidden sm:block">
-          *Arahkan kursor ke balok untuk pop-up detail, atau klik area putih untuk input sewa.
-        </div>
-      </div>
 
       {/* Mobile Swipe Guidance Banner */}
       <div className="flex md:hidden items-center justify-between px-3.5 py-2 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 text-[11px] text-orange-900 border-b border-orange-200/70 font-semibold shadow-2xs">
@@ -492,11 +457,7 @@ export default function MonthlyGanttTimeline({
                         onClick={() => onOpenCreateBooking && onOpenCreateBooking({
                           property_id: prop.id,
                           check_in_date: day.dateString,
-                          check_out_date: (() => {
-                            const d = new Date(day.dateString);
-                            d.setDate(d.getDate() + 1);
-                            return d.toISOString().slice(0, 10);
-                          })()
+                          check_out_date: getNextLocalDateString(day.dateString)
                         })}
                         className={`p-0 border-r border-gray-100 text-center bg-white hover:bg-orange-50/80 cursor-pointer transition-colors group relative w-10 min-w-[40px] max-w-[40px] sm:w-12 sm:min-w-[48px] sm:max-w-[48px] ${
                           day.isToday ? 'bg-orange-50/20' : day.isWeekend ? 'bg-gray-50/30' : ''
@@ -534,15 +495,11 @@ export default function MonthlyGanttTimeline({
               <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                 hoveredBooking.payment_status === 'confirmed' || hoveredBooking.payment_status === 'completed'
                   ? 'bg-emerald-500 text-white'
-                  : hoveredBooking.payment_status === 'dp_paid'
-                    ? 'bg-amber-400 text-amber-950 font-black'
-                    : 'bg-rose-500 text-white'
+                  : 'bg-amber-500 text-white'
               }`}>
                 {hoveredBooking.payment_status === 'confirmed' || hoveredBooking.payment_status === 'completed'
                   ? 'LUNAS'
-                  : hoveredBooking.payment_status === 'dp_paid'
-                    ? 'SUDAH DP'
-                    : 'BELUM DP'}
+                  : 'BELUM LUNAS'}
               </span>
             </div>
 
@@ -577,17 +534,51 @@ export default function MonthlyGanttTimeline({
 
             {/* Payment Summary */}
             <div className="space-y-1 pt-1 text-[11px]">
-              {hoveredBooking.payment_status === 'dp_paid' && (
-                <div className="flex justify-between text-amber-300">
-                  <span>Nominal DP Masuk:</span>
-                  <span className="font-bold">{formatRupiah(hoveredBooking.down_payment_amount || 0)}</span>
-                </div>
-              )}
               <div className="flex justify-between text-gray-300">
                 <span>Total Biaya Sewa:</span>
                 <span className="font-extrabold text-orange-400 text-xs">{formatRupiah(hoveredBooking.grand_total)}</span>
               </div>
             </div>
+
+            {/* Bukti Transfer Tamu (Clickable) */}
+            {hoveredBooking.payment_proof_image ? (
+              <div className="pt-2 border-t border-gray-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-gray-300 font-medium flex items-center gap-1">
+                    <FileText className="w-3 h-3 text-emerald-400" />
+                    Bukti Transfer:
+                  </span>
+                  <a
+                    href={getImageUrl(hoveredBooking.payment_proof_image)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-orange-400 hover:text-orange-300 font-bold text-[10px] flex items-center gap-0.5 hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Buka Foto
+                  </a>
+                </div>
+                <a
+                  href={getImageUrl(hoveredBooking.payment_proof_image)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="block rounded-lg overflow-hidden border border-gray-700 hover:border-orange-500 transition-colors bg-gray-950 p-1 group cursor-pointer"
+                  title="Klik untuk membuka bukti transfer ukuran penuh"
+                >
+                  <img
+                    src={getImageUrl(hoveredBooking.payment_proof_image)}
+                    alt="Bukti Transfer"
+                    className="w-full h-24 object-contain rounded group-hover:scale-[1.03] transition-transform duration-150"
+                  />
+                </a>
+              </div>
+            ) : (
+              <div className="pt-1 border-t border-gray-800 text-[10px] text-gray-400 italic">
+                *Belum ada bukti transfer diunggah
+              </div>
+            )}
 
             {/* Quick Action Hint */}
             <div className="pt-2 border-t border-gray-800 flex items-center justify-between text-[10px] text-gray-400">

@@ -8,7 +8,7 @@ import MonthlyGanttTimeline from '../../components/MonthlyGanttTimeline';
 import { TableRowSkeleton, EmptyState } from '../../components/Skeleton';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
-import { formatRupiah, formatDateIndo } from '../../utils/formatters';
+import { formatRupiah, formatDateIndo, formatLocalDateString, getImageUrl } from '../../utils/formatters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { 
   Search, 
@@ -340,8 +340,8 @@ export default function AdminBookingsPage() {
       guest_phone: booking.guest_phone || '',
       number_of_guests: booking.number_of_guests || 1,
       rental_type: booking.rental_type || 'harian',
-      check_in_date: typeof booking.check_in_date === 'string' ? booking.check_in_date.slice(0, 10) : '',
-      check_out_date: typeof booking.check_out_date === 'string' ? booking.check_out_date.slice(0, 10) : '',
+      check_in_date: formatLocalDateString(booking.check_in_date),
+      check_out_date: formatLocalDateString(booking.check_out_date),
       payment_status: booking.payment_status || 'pending_payment',
       down_payment_amount: booking.down_payment_amount || 0,
       payment_method: booking.payment_method || 'bank_transfer',
@@ -780,19 +780,42 @@ export default function AdminBookingsPage() {
 
               {/* Bukti Transfer Image */}
               <div>
-                <label className="font-bold text-gray-800 block mb-2">Foto Bukti Transfer Tamu:</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-bold text-gray-800">Foto Bukti Transfer Tamu:</label>
+                  {selectedBooking.payment_proof_image && (
+                    <a
+                      href={getImageUrl(selectedBooking.payment_proof_image)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-orange-600 hover:text-orange-700 font-bold text-xs flex items-center gap-1 hover:underline"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Buka Ukuran Penuh</span>
+                    </a>
+                  )}
+                </div>
                 {selectedBooking.payment_proof_image ? (
-                  <div className="rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 max-h-80 flex items-center justify-center p-2">
-                    <div className="max-h-80 w-full overflow-hidden rounded-xl">
+                  <a
+                    href={getImageUrl(selectedBooking.payment_proof_image)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block group relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 max-h-80 cursor-pointer shadow-xs hover:border-orange-400 transition-all"
+                    title="Klik untuk membuka bukti transfer ukuran penuh"
+                  >
+                    <div className="max-h-80 w-full overflow-hidden rounded-xl flex items-center justify-center p-2">
                       <ImageWithFallback
                         src={selectedBooking.payment_proof_image}
                         alt="Bukti Transfer"
-                        className="max-h-80 object-contain w-full rounded-xl"
+                        className="max-h-80 object-contain w-full rounded-xl transition-transform duration-200 group-hover:scale-[1.02]"
                         showText={true}
                         fallbackText="Bukti Transfer Tidak Dapat Dimuat"
                       />
                     </div>
-                  </div>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-bold text-xs">
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Klik untuk membuka foto asli / download</span>
+                    </div>
+                  </a>
                 ) : (
                   <div className="p-8 text-center bg-gray-100 rounded-2xl text-gray-400 border border-dashed border-gray-300">
                     <ImageIcon className="w-8 h-8 mx-auto mb-1 text-gray-300" />
@@ -1009,10 +1032,9 @@ export default function AdminBookingsPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, payment_status: e.target.value })}
                   className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
                 >
-                  <option value="pending_payment">🔴 Menunggu Pembayaran (Belum DP)</option>
-                  <option value="dp_paid">🟡 Sudah DP (Down Payment)</option>
-                  <option value="waiting_approval">Menunggu Verifikasi (Bukti Diunggah)</option>
-                  <option value="confirmed">🟢 Dikonfirmasi (Lunas)</option>
+                  <option value="pending_payment">Belum Lunas (Menunggu Pembayaran)</option>
+                  <option value="waiting_approval">Menunggu Verifikasi Admin</option>
+                  <option value="confirmed">Lunas (Terkonfirmasi)</option>
                   <option value="completed">Selesai (Checkout)</option>
                   <option value="rejected">Ditolak</option>
                   <option value="cancelled">Dibatalkan</option>
@@ -1034,30 +1056,6 @@ export default function AdminBookingsPage() {
                 </select>
               </div>
             </div>
-
-            {/* Input DP jika status dp_paid */}
-            {editFormData.payment_status === 'dp_paid' && (
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
-                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1">
-                  Nominal Uang Muka / DP yang Diterima (Rp) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={editFormData.down_payment_amount}
-                  onChange={(e) => setEditFormData({ ...editFormData, down_payment_amount: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white border border-amber-300 rounded-xl font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono"
-                  placeholder="Contoh: 1000000"
-                />
-                {Number(editFormData.grand_total) > 0 && (
-                  <div className="text-[11px] text-amber-800 font-medium mt-1.5 flex justify-between">
-                    <span>Sisa Pelunasan:</span>
-                    <strong className="font-bold">{formatRupiah(Math.max(0, Number(editFormData.grand_total) - Number(editFormData.down_payment_amount || 0)))}</strong>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Grand Total */}
             <div>
@@ -1379,83 +1377,22 @@ export default function AdminBookingsPage() {
               </div>
             </div>
 
-            {/* Status Pembayaran (Balok Merah, Kuning, Hijau) */}
-            <div>
-              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1.5">
-                Status Pembayaran (Warna Balok Timeline)
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {[
-                  {
-                    status: 'pending_payment',
-                    color: 'border-rose-400 bg-rose-50 text-rose-800',
-                    dot: 'bg-rose-500',
-                    title: '🔴 Belum DP',
-                    desc: 'Balok Merah'
-                  },
-                  {
-                    status: 'dp_paid',
-                    color: 'border-amber-400 bg-amber-50 text-amber-900',
-                    dot: 'bg-amber-500',
-                    title: '🟡 Sudah DP',
-                    desc: 'Balok Kuning'
-                  },
-                  {
-                    status: 'confirmed',
-                    color: 'border-emerald-400 bg-emerald-50 text-emerald-800',
-                    dot: 'bg-emerald-500',
-                    title: '🟢 Lunas',
-                    desc: 'Balok Hijau'
-                  }
-                ].map((item) => (
-                  <button
-                    key={item.status}
-                    type="button"
-                    onClick={() => setCreateFormData({ ...createFormData, payment_status: item.status })}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      createFormData.payment_status === item.status
-                        ? `${item.color} ring-2 ring-orange-500/30 font-bold shadow-xs`
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="font-bold flex items-center gap-1.5">
-                      <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
-                      <span>{item.title}</span>
-                    </div>
-                    <div className="text-[10px] text-gray-500 mt-0.5 ml-4">{item.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Nominal DP Input if dp_paid */}
-            {createFormData.payment_status === 'dp_paid' && (
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                <label className="block text-xs font-bold text-amber-950 uppercase tracking-wider">
-                  Nominal DP yang Diterima (Rp) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="Contoh: 500000"
-                  value={createFormData.down_payment_amount}
-                  onChange={(e) => setCreateFormData({ ...createFormData, down_payment_amount: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white border border-amber-300 rounded-xl font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono"
-                />
-                {Number(createFormData.grand_total) > 0 && (
-                  <div className="text-[11px] text-amber-800 font-medium flex justify-between pt-1 border-t border-amber-200/60">
-                    <span>Sisa Pelunasan:</span>
-                    <strong className="font-bold">
-                      {formatRupiah(Math.max(0, Number(createFormData.grand_total) - Number(createFormData.down_payment_amount || 0)))}
-                    </strong>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Metode Pembayaran & Total Tagihan */}
+            {/* Status & Metode Pembayaran */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Status Pembayaran
+                </label>
+                <select
+                  value={createFormData.payment_status}
+                  onChange={(e) => setCreateFormData({ ...createFormData, payment_status: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-medium"
+                >
+                  <option value="pending_payment">Belum Lunas (Menunggu Pembayaran)</option>
+                  <option value="confirmed">Lunas (Terkonfirmasi)</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
                   Metode Pembayaran
@@ -1470,38 +1407,39 @@ export default function AdminBookingsPage() {
                   <option value="cash">Bayar di Tempat (Cash)</option>
                 </select>
               </div>
+            </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-                    Total Tarif (Rp) <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const recalculated = calculateBookingPrice(
-                        createFormData.property_id,
-                        createFormData.check_in_date,
-                        createFormData.check_out_date,
-                        createFormData.rental_type
-                      );
-                      setCreateFormData({ ...createFormData, grand_total: recalculated });
-                      toast.success(`Dihitung otomatis: ${formatRupiah(recalculated)}`);
-                    }}
-                    className="text-[10px] text-orange-600 hover:text-orange-700 font-bold underline cursor-pointer"
-                  >
-                    Hitung Ulang
-                  </button>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={createFormData.grand_total}
-                  onChange={(e) => setCreateFormData({ ...createFormData, grand_total: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-mono"
-                />
+            {/* Total Tarif */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  Total Tarif (Rp) <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recalculated = calculateBookingPrice(
+                      createFormData.property_id,
+                      createFormData.check_in_date,
+                      createFormData.check_out_date,
+                      createFormData.rental_type
+                    );
+                    setCreateFormData({ ...createFormData, grand_total: recalculated });
+                    toast.success(`Dihitung otomatis: ${formatRupiah(recalculated)}`);
+                  }}
+                  className="text-[10px] text-orange-600 hover:text-orange-700 font-bold underline cursor-pointer"
+                >
+                  Hitung Ulang
+                </button>
               </div>
+              <input
+                type="number"
+                min="0"
+                required
+                value={createFormData.grand_total}
+                onChange={(e) => setCreateFormData({ ...createFormData, grand_total: e.target.value })}
+                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-mono"
+              />
             </div>
 
             {/* Notes */}

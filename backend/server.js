@@ -79,7 +79,9 @@ const dbPool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  dateStrings: true,
+  timezone: '+07:00'
 });
 
 // Test connection on startup
@@ -1170,9 +1172,14 @@ app.get('/api/bookings/timeline', async (req, res) => {
     let bookQuery = `
       SELECT 
         b.id, b.invoice_number, b.property_id, b.guest_name, b.guest_phone, b.guest_email,
-        b.number_of_guests, b.check_in_date, b.check_out_date, b.total_nights,
+        b.number_of_guests, 
+        DATE_FORMAT(b.check_in_date, '%Y-%m-%d') AS check_in_date, 
+        DATE_FORMAT(b.check_out_date, '%Y-%m-%d') AS check_out_date, 
+        b.total_nights,
         b.rental_type, b.room_price_per_night, b.total_room_price, b.grand_total,
         b.down_payment_amount, b.payment_status, b.payment_method, b.admin_notes,
+        b.payment_proof_image, b.payment_proof_uploaded_at,
+        b.special_requests, b.hostex_reservation_code, b.hostex_sync_status,
         p.name AS property_name, p.building_name, p.unit_number
       FROM bookings b
       JOIN properties p ON b.property_id = p.id
@@ -1254,6 +1261,8 @@ app.get('/api/bookings', async (req, res) => {
     const [rows] = await dbPool.query(
       `SELECT 
         b.*,
+        DATE_FORMAT(b.check_in_date, '%Y-%m-%d') AS check_in_date,
+        DATE_FORMAT(b.check_out_date, '%Y-%m-%d') AS check_out_date,
         p.name AS property_name,
         CONCAT(p.location, ', ', p.city) AS property_location,
         p.images AS property_images
@@ -1290,6 +1299,8 @@ app.get('/api/bookings/:identifier', async (req, res) => {
     const query = `
       SELECT 
         b.*,
+        DATE_FORMAT(b.check_in_date, '%Y-%m-%d') AS check_in_date,
+        DATE_FORMAT(b.check_out_date, '%Y-%m-%d') AS check_out_date,
         p.name AS property_name,
         p.building_name,
         p.unit_number,
