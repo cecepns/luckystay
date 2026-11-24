@@ -236,7 +236,7 @@ export default function CleaningChecklistPage() {
       }));
 
       toast.success(
-        `Foto berhasil dikompres: ${formatBytes(originalSize)} → ${formatBytes(compressedSize)} (-${ratio}%)`,
+        `Foto dikompres: ${formatBytes(originalSize)} → ${formatBytes(compressedSize)} (-${ratio}%)`,
         { id: toastId }
       );
     } catch (err) {
@@ -459,66 +459,68 @@ export default function CleaningChecklistPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-gray-50 text-gray-800 py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-orange-500 selection:text-white">
       <div className="max-w-3xl mx-auto">
         
-        {/* Top Header Card */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900 to-slate-900/90 border border-slate-800 p-6 sm:p-8 mb-6 shadow-2xl">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Top Header Card (Clean White) */}
+        <div className="relative overflow-hidden rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-8 mb-6 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold tracking-wider uppercase mb-2">
-                <Sparkles className="w-3.5 h-3.5" />
-                DAILY AFTER CLEANING REPORT
+              <div className="flex items-center gap-3 mb-3">
+                <img src="/logo.png" alt="Lucky Stay" className="h-9 w-auto" />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 border border-orange-200/60 text-orange-600 text-[11px] font-bold tracking-wider uppercase">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  Housekeeping Checklist
+                </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                LUCKYSTAY PROPERTY MANAGEMENT
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                DAILY AFTER CLEANING REPORT
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl leading-relaxed">
-                Format laporan after cleaning harian apartemen yang digunakan oleh tim housekeeping setelah selesai membersihkan unit.
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 max-w-xl leading-relaxed">
+                Format laporan after cleaning harian apartemen – Lucky Stay Property Management setelah tim housekeeping selesai membersihkan unit.
               </p>
             </div>
-            <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500">
-              <ClipboardCheck className="w-8 h-8" />
+            <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-orange-500 shrink-0 shadow-sm">
+              <ClipboardCheck className="w-7 h-7" />
             </div>
           </div>
         </div>
 
-        {/* Success Modal / Banner */}
+        {/* Success Modal / Banner (Clean Light Emerald) */}
         {submittedData && (
-          <div className="mb-8 rounded-3xl bg-emerald-950/60 border border-emerald-500/30 p-6 sm:p-8 shadow-xl text-center animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+          <div className="mb-8 rounded-3xl bg-white border border-emerald-200 p-6 sm:p-8 shadow-sm text-center">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold tracking-wide uppercase">
+            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold tracking-wide uppercase border border-emerald-200">
               Laporan Terkirim & Tercatat
             </span>
-            <h2 className="text-xl sm:text-2xl font-bold text-white mt-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-2">
               Terima Kasih, Laporan Berhasil Dikirim!
             </h2>
-            <p className="text-sm text-slate-300 mt-1">
-              Kode Laporan: <span className="font-mono font-bold text-emerald-400">{submittedData.report_code}</span>
+            <p className="text-sm text-gray-600 mt-1">
+              Kode Laporan: <span className="font-mono font-bold text-orange-600">{submittedData.report_code}</span>
             </p>
-            <div className="mt-4 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-left max-w-md mx-auto text-xs space-y-1.5 text-slate-300">
-              <div><strong className="text-slate-400">Unit:</strong> {submittedData.property_name} ({submittedData.unit_number})</div>
-              <div><strong className="text-slate-400">Petugas:</strong> {submittedData.cleaner_name}</div>
-              <div><strong className="text-slate-400">Status:</strong> <span className="text-emerald-400 font-semibold">{submittedData.unit_status}</span></div>
-              <div><strong className="text-slate-400">Penyelesaian:</strong> {submittedData.completion_percent}% ({submittedData.completed_items}/{submittedData.total_items} checklist)</div>
+            <div className="mt-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 text-left max-w-md mx-auto text-xs space-y-1.5 text-gray-700">
+              <div><strong className="text-gray-500">Unit:</strong> {submittedData.property_name} ({submittedData.unit_number})</div>
+              <div><strong className="text-gray-500">Petugas:</strong> {submittedData.cleaner_name}</div>
+              <div><strong className="text-gray-500">Status:</strong> <span className="text-emerald-700 font-semibold">{submittedData.unit_status}</span></div>
+              <div><strong className="text-gray-500">Penyelesaian:</strong> {submittedData.completion_percent}% ({submittedData.completed_items}/{submittedData.total_items} checklist selesai)</div>
             </div>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={copyChecklistText}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700 shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all border border-gray-200 shadow-sm cursor-pointer"
               >
-                {hasCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
-                <span>{hasCopied ? 'Tersalin!' : 'Salin Laporan ke WhatsApp'}</span>
+                {hasCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-orange-500" />}
+                <span>{hasCopied ? 'Tersalin ke Clipboard!' : 'Salin Laporan ke WhatsApp'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleResetForm}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-lg shadow-orange-500/20"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-md shadow-orange-500/20 cursor-pointer"
               >
                 <span>Isi Laporan Baru</span>
                 <ArrowRight className="w-4 h-4" />
@@ -531,55 +533,51 @@ export default function CleaningChecklistPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Section A: INFORMASI UNIT */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-sm">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
                 A
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white">INFORMASI UNIT</h2>
-                <p className="text-xs text-slate-400">Lengkapi data properti dan waktu pelaksanaan cleaning</p>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">INFORMASI UNIT</h2>
+                <p className="text-xs text-gray-500">Lengkapi data properti dan waktu pelaksanaan cleaning</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Tanggal Cleaning */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Tanggal Cleaning <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    required
-                    value={formData.cleaning_date}
-                    onChange={(e) => setFormData({ ...formData, cleaning_date: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors"
-                  />
-                </div>
+                <input
+                  type="date"
+                  required
+                  value={formData.cleaning_date}
+                  onChange={(e) => setFormData({ ...formData, cleaning_date: e.target.value })}
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors"
+                />
               </div>
 
               {/* Nama Petugas */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Nama Petugas Cleaning <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Budi Santoso"
-                    value={formData.cleaner_name}
-                    onChange={(e) => setFormData({ ...formData, cleaner_name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
-                  />
-                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Budi Santoso"
+                  value={formData.cleaner_name}
+                  onChange={(e) => setFormData({ ...formData, cleaner_name: e.target.value })}
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-gray-400"
+                />
               </div>
 
               {/* Nama Apartemen */}
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-300">
+                  <label className="text-xs font-semibold text-gray-700">
                     Nama Apartemen <span className="text-rose-500">*</span>
                   </label>
                   <button
@@ -588,7 +586,7 @@ export default function CleaningChecklistPage() {
                       setIsCustomProperty(!isCustomProperty);
                       setFormData((prev) => ({ ...prev, property_name: '' }));
                     }}
-                    className="text-[11px] text-orange-400 hover:text-orange-300 underline font-medium"
+                    className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold underline cursor-pointer"
                   >
                     {isCustomProperty ? 'Pilih dari daftar properti' : 'Ketik manual / Nama baru'}
                   </button>
@@ -601,7 +599,7 @@ export default function CleaningChecklistPage() {
                     placeholder="Contoh: Grand Asia Afrika Residence"
                     value={formData.property_name}
                     onChange={(e) => setFormData({ ...formData, property_name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                    className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-gray-400"
                   />
                 ) : (
                   <select
@@ -616,7 +614,7 @@ export default function CleaningChecklistPage() {
                         unit_number: matched?.unit_number || prev.unit_number,
                       }));
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors"
+                    className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors font-medium"
                   >
                     <option value="">-- Pilih Apartemen / Properti --</option>
                     {properties.map((p) => (
@@ -630,7 +628,7 @@ export default function CleaningChecklistPage() {
 
               {/* Tower / Lantai / Nomor Unit */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Tower / Lantai / Nomor Unit <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -639,19 +637,19 @@ export default function CleaningChecklistPage() {
                   placeholder="Contoh: Tower B / Lt 15 / Unit 1502"
                   value={formData.unit_number}
                   onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-gray-400"
                 />
               </div>
 
               {/* Status Unit */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Status Unit <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={formData.unit_status}
                   onChange={(e) => setFormData({ ...formData, unit_status: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 transition-colors font-medium"
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors font-medium"
                 >
                   <option value="Siap Huni">✅ Siap Huni (Clean & Ready to Check-In)</option>
                   <option value="Perlu Perbaikan">⚠️ Perlu Perbaikan (Ada Kerusakan)</option>
@@ -663,11 +661,11 @@ export default function CleaningChecklistPage() {
               {/* Waktu Mulai & Selesai */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-300">Waktu Mulai</label>
+                  <label className="text-xs font-semibold text-gray-700">Waktu Mulai</label>
                   <button
                     type="button"
                     onClick={() => setTimeToNow('start_time')}
-                    className="text-[10px] text-orange-400 hover:text-orange-300"
+                    className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
                   >
                     Set Sekarang
                   </button>
@@ -676,17 +674,17 @@ export default function CleaningChecklistPage() {
                   type="time"
                   value={formData.start_time}
                   onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-300">Waktu Selesai</label>
+                  <label className="text-xs font-semibold text-gray-700">Waktu Selesai</label>
                   <button
                     type="button"
                     onClick={() => setTimeToNow('end_time')}
-                    className="text-[10px] text-orange-400 hover:text-orange-300"
+                    className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
                   >
                     Set Sekarang
                   </button>
@@ -695,44 +693,44 @@ export default function CleaningChecklistPage() {
                   type="time"
                   value={formData.end_time}
                   onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors"
                 />
               </div>
             </div>
           </div>
 
           {/* Section B: CHECKLIST AFTER CLEANING */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-800">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-sm">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
                   B
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white">CHECKLIST AFTER CLEANING</h2>
-                  <p className="text-xs text-slate-400">Centang setelah memastikan setiap bagian sudah bersih dan siap digunakan.</p>
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">CHECKLIST AFTER CLEANING</h2>
+                  <p className="text-xs text-gray-500">Centang setelah memastikan setiap bagian sudah bersih dan siap digunakan.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={checkAllItems}
-                className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-xs font-semibold border border-orange-500/20 transition-colors"
+                className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-bold border border-orange-200 transition-colors cursor-pointer"
               >
                 Centang Semua (27 Item)
               </button>
             </div>
 
             {/* Progress Bar Widget */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 mb-6">
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 mb-6">
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-semibold text-slate-300">Progress checklist:</span>
-                <span className="font-bold text-emerald-400 text-sm">
-                  {progressPercent}% <span className="text-xs text-slate-500 font-normal">({completedCount} dari {TOTAL_CHECKLIST_COUNT} item selesai)</span>
+                <span className="font-semibold text-gray-700">Progress checklist:</span>
+                <span className="font-bold text-emerald-600 text-sm">
+                  {progressPercent}% <span className="text-xs text-gray-500 font-normal">({completedCount} dari {TOTAL_CHECKLIST_COUNT} item selesai)</span>
                 </span>
               </div>
-              <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+              <div className="w-full h-2.5 rounded-full bg-gray-200 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 rounded-full"
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300 rounded-full"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -746,12 +744,12 @@ export default function CleaningChecklistPage() {
                 const isAllDone = sectionCompleted === section.items.length;
 
                 return (
-                  <div key={section.id} className="rounded-2xl bg-slate-950/60 border border-slate-800/80 p-4 sm:p-5">
-                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/60">
+                  <div key={section.id} className="rounded-2xl bg-gray-50/70 border border-gray-200/70 p-4 sm:p-5">
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200/60">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white tracking-wide">{section.title}</span>
+                        <span className="text-sm font-bold text-gray-900 tracking-wide">{section.title}</span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isAllDone ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                          isAllDone ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
                         }`}>
                           {sectionCompleted}/{section.items.length}
                         </span>
@@ -759,7 +757,7 @@ export default function CleaningChecklistPage() {
                       <button
                         type="button"
                         onClick={() => toggleSectionAll(section.id)}
-                        className="text-[11px] text-slate-400 hover:text-orange-400 transition-colors"
+                        className="text-[11px] text-gray-500 hover:text-orange-600 font-medium transition-colors cursor-pointer"
                       >
                         {isAllDone ? 'Hapus Centang' : 'Centang Bagian Ini'}
                       </button>
@@ -772,20 +770,20 @@ export default function CleaningChecklistPage() {
                           <label
                             key={item}
                             onClick={() => toggleItem(section.id, item)}
-                            className={`flex items-start gap-3 p-2.5 rounded-xl transition-all cursor-pointer select-none ${
+                            className={`flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer select-none ${
                               isChecked
-                                ? 'bg-emerald-950/30 border border-emerald-500/20 text-slate-200'
-                                : 'bg-slate-900/40 hover:bg-slate-900/80 border border-transparent text-slate-400 hover:text-slate-300'
+                                ? 'bg-emerald-50/90 border border-emerald-200 text-gray-900 shadow-xs'
+                                : 'bg-white hover:bg-gray-100/70 border border-gray-200/80 text-gray-600'
                             }`}
                           >
                             <div className="mt-0.5 shrink-0">
                               {isChecked ? (
-                                <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-950/60" />
+                                <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
                               ) : (
-                                <Circle className="w-5 h-5 text-slate-600 hover:text-slate-500" />
+                                <Circle className="w-5 h-5 text-gray-300 hover:text-gray-400" />
                               )}
                             </div>
-                            <span className={`text-xs sm:text-sm font-medium ${isChecked ? 'line-through text-slate-400' : ''}`}>
+                            <span className={`text-xs sm:text-sm font-medium ${isChecked ? 'line-through text-gray-500' : ''}`}>
                               {item}
                             </span>
                           </label>
@@ -799,14 +797,14 @@ export default function CleaningChecklistPage() {
           </div>
 
           {/* Section C: KONDISI KHUSUS / KERUSAKAN */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm">
                 C
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white">KONDISI KHUSUS / KERUSAKAN</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">KONDISI KHUSUS / KERUSAKAN</h2>
+                <p className="text-xs text-gray-500">
                   Catat jika ditemukan barang rusak, hilang, noda membandel, atau fasilitas tidak berfungsi.
                 </p>
               </div>
@@ -817,19 +815,19 @@ export default function CleaningChecklistPage() {
               placeholder="Contoh: Remote AC rusak, gelas pecah, keran wastafel bocor, noda sprei tidak hilang..."
               value={formData.damage_notes}
               onChange={(e) => setFormData({ ...formData, damage_notes: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-rose-500 transition-colors placeholder:text-slate-600"
+              className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-2xl p-4 text-xs sm:text-sm text-gray-900 focus:outline-none focus:border-rose-500 transition-colors placeholder:text-gray-400"
             />
           </div>
 
           {/* Section D: CATATAN TAMBAHAN */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
                 D
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white">CATATAN TAMBAHAN</h2>
-                <p className="text-xs text-slate-400">Catatan khusus dari petugas cleaning untuk tim operasional</p>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">CATATAN TAMBAHAN</h2>
+                <p className="text-xs text-gray-500">Catatan khusus dari petugas cleaning untuk tim operasional</p>
               </div>
             </div>
 
@@ -838,20 +836,20 @@ export default function CleaningChecklistPage() {
               placeholder="Catatan petugas cleaning (opsional)..."
               value={formData.additional_notes}
               onChange={(e) => setFormData({ ...formData, additional_notes: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
+              className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-2xl p-4 text-xs sm:text-sm text-gray-900 focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-400"
             />
           </div>
 
           {/* Section E: FOTO DOKUMENTASI (WITH FRONTEND COMPRESSION) */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">
                 E
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white">FOTO DOKUMENTASI</h2>
-                <p className="text-xs text-slate-400">
-                  Foto otomatis dikompres di browser agar upload cepat dan hemat kuota
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">FOTO DOKUMENTASI</h2>
+                <p className="text-xs text-gray-500">
+                  Foto otomatis dikompres di browser agar upload instan dan hemat kuota
                 </p>
               </div>
             </div>
@@ -868,19 +866,19 @@ export default function CleaningChecklistPage() {
                 return (
                   <div
                     key={item.key}
-                    className="relative rounded-2xl bg-slate-950 border border-slate-800 p-3 flex flex-col justify-between"
+                    className="relative rounded-2xl bg-gray-50/70 border border-gray-200/80 p-3 flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-200">{item.label}</span>
+                      <span className="text-xs font-semibold text-gray-800">{item.label}</span>
                       {photoState?.ratio > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
                           -{photoState.ratio}%
                         </span>
                       )}
                     </div>
 
                     {photoState?.preview ? (
-                      <div className="relative group rounded-xl overflow-hidden aspect-video bg-slate-900 border border-slate-800">
+                      <div className="relative group rounded-xl overflow-hidden aspect-video bg-gray-200 border border-gray-200">
                         <img
                           src={photoState.preview}
                           alt={item.label}
@@ -889,19 +887,19 @@ export default function CleaningChecklistPage() {
                         <button
                           type="button"
                           onClick={() => removePhoto(item.key)}
-                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 transition-colors shadow-md"
+                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-md cursor-pointer"
                           title="Hapus foto"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        <div className="absolute bottom-0 inset-x-0 p-1.5 bg-black/70 text-[10px] text-slate-300 truncate">
+                        <div className="absolute bottom-0 inset-x-0 p-1.5 bg-black/60 text-[10px] text-white truncate">
                           {formatBytes(photoState.compressedSize)}
                         </div>
                       </div>
                     ) : (
-                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-800 hover:border-orange-500/50 bg-slate-900/40 hover:bg-slate-900 aspect-video cursor-pointer transition-all">
-                        <Camera className="w-6 h-6 text-slate-500 mb-1 group-hover:text-orange-400" />
-                        <span className="text-[11px] text-slate-400 font-medium">Ambil / Upload Foto</span>
+                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 hover:border-orange-500 bg-white hover:bg-orange-50/30 aspect-video cursor-pointer transition-all">
+                        <Camera className="w-6 h-6 text-gray-400 mb-1 group-hover:text-orange-500" />
+                        <span className="text-[11px] text-gray-600 font-medium">Ambil / Upload Foto</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -916,28 +914,28 @@ export default function CleaningChecklistPage() {
               })}
 
               {/* Video Dokumentasi (File or URL) */}
-              <div className="relative rounded-2xl bg-slate-950 border border-slate-800 p-3 flex flex-col justify-between">
+              <div className="relative rounded-2xl bg-gray-50/70 border border-gray-200/80 p-3 flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-200">Video Kondisi Akhir Unit</span>
-                  <span className="text-[10px] text-slate-500 font-normal">(Opsional)</span>
+                  <span className="text-xs font-semibold text-gray-800">Video Kondisi Akhir Unit</span>
+                  <span className="text-[10px] text-gray-400 font-normal">(Opsional)</span>
                 </div>
 
                 {videoPreview ? (
-                  <div className="relative rounded-xl overflow-hidden aspect-video bg-slate-900 border border-slate-800 flex items-center justify-center">
+                  <div className="relative rounded-xl overflow-hidden aspect-video bg-black border border-gray-200 flex items-center justify-center">
                     <video src={videoPreview} controls className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={removeVideo}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 transition-colors shadow-md z-10"
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-md z-10 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
                   <div>
-                    <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-800 hover:border-orange-500/50 bg-slate-900/40 hover:bg-slate-900 aspect-video cursor-pointer transition-all mb-2">
-                      <Video className="w-6 h-6 text-slate-500 mb-1" />
-                      <span className="text-[11px] text-slate-400 font-medium">Upload File Video</span>
+                    <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 hover:border-orange-500 bg-white hover:bg-orange-50/30 aspect-video cursor-pointer transition-all mb-2">
+                      <Video className="w-6 h-6 text-gray-400 mb-1" />
+                      <span className="text-[11px] text-gray-600 font-medium">Upload File Video</span>
                       <input
                         type="file"
                         accept="video/mp4,video/quicktime,video/webm"
@@ -950,7 +948,7 @@ export default function CleaningChecklistPage() {
                       placeholder="Atau link Google Drive / Video URL"
                       value={formData.video_url}
                       onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 focus:outline-none focus:border-orange-500 placeholder:text-slate-600"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 focus:outline-none focus:border-orange-500 placeholder:text-gray-400"
                     />
                   </div>
                 )}
@@ -959,33 +957,33 @@ export default function CleaningChecklistPage() {
           </div>
 
           {/* Section F: KONFIRMASI */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-7 shadow-lg">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center font-bold text-sm">
                 F
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-white">KONFIRMASI</h2>
-                <p className="text-xs text-slate-400">Pernyataan kepatuhan checklist kebersihan harian</p>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">KONFIRMASI</h2>
+                <p className="text-xs text-gray-500">Pernyataan kepatuhan checklist kebersihan harian</p>
               </div>
             </div>
 
-            <label className="flex items-start gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+            <label className="flex items-start gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100/60 transition-colors">
               <input
                 type="checkbox"
                 required
                 checked={formData.is_confirmed}
                 onChange={(e) => setFormData({ ...formData, is_confirmed: e.target.checked })}
-                className="w-5 h-5 mt-0.5 rounded text-orange-500 focus:ring-orange-500 focus:ring-offset-slate-950 bg-slate-900 border-slate-700"
+                className="w-5 h-5 mt-0.5 rounded text-orange-500 focus:ring-orange-500 bg-white border-gray-300"
               />
-              <span className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
+              <span className="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">
                 Saya menyatakan unit telah dibersihkan dan diperiksa dengan teliti sesuai checklist di atas, serta seluruh dokumentasi kondisi aktual telah dilampirkan.
               </span>
             </label>
 
             {formData.cleaner_name && (
-              <div className="mt-3 text-xs text-slate-400">
-                Nama Petugas: <strong className="text-slate-200">{formData.cleaner_name}</strong>
+              <div className="mt-3 text-xs text-gray-500">
+                Nama Petugas: <strong className="text-gray-900">{formData.cleaner_name}</strong>
               </div>
             )}
           </div>
@@ -995,7 +993,7 @@ export default function CleaningChecklistPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full sm:flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-xl shadow-orange-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              className="w-full sm:flex-1 py-4 px-6 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
                 <>
@@ -1013,20 +1011,20 @@ export default function CleaningChecklistPage() {
             <button
               type="button"
               onClick={copyChecklistText}
-              className="w-full sm:w-auto py-4 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-800 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto py-4 px-6 rounded-2xl bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs border border-gray-200 shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              {hasCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
+              {hasCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-orange-500" />}
               <span>Salin Laporan Checklist</span>
             </button>
           </div>
 
           {/* SOP Guide Box (as shown in user image) */}
-          <div className="rounded-3xl bg-slate-900/60 border border-slate-800/80 p-6 text-xs text-slate-400 space-y-2">
-            <div className="flex items-center gap-2 text-slate-300 font-bold mb-2">
-              <ShieldCheck className="w-4 h-4 text-orange-400" />
+          <div className="rounded-3xl bg-white border border-gray-200/80 p-6 shadow-sm text-xs text-gray-600 space-y-2">
+            <div className="flex items-center gap-2 text-gray-900 font-bold mb-2">
+              <ShieldCheck className="w-4 h-4 text-orange-500" />
               <span>Saran SOP untuk tim Housekeeping Luckystay</span>
             </div>
-            <ol className="list-decimal list-inside space-y-1.5 leading-relaxed text-slate-400">
+            <ol className="list-decimal list-inside space-y-1.5 leading-relaxed text-gray-600">
               <li>Petugas wajib mengisi laporan setiap selesai cleaning satu unit.</li>
               <li>Wajib mengambil foto dan video kondisi unit setelah dibersihkan.</li>
               <li>Jika ditemukan kerusakan atau barang hilang, wajib melapor sebelum meninggalkan unit.</li>
