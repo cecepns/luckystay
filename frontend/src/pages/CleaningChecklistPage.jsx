@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ClipboardCheck, 
   CheckCircle2, 
@@ -6,21 +6,18 @@ import {
   Camera, 
   Video, 
   AlertTriangle, 
-  FileText, 
   Send, 
   Copy, 
   Check, 
-  Building2, 
   Clock, 
   Calendar, 
   User, 
   Trash2, 
-  Eye, 
   Sparkles, 
-  CheckSquare, 
   ShieldCheck, 
   ArrowRight,
-  Info
+  Plus,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../utils/request';
@@ -87,15 +84,7 @@ const CHECKLIST_SECTIONS = [
   },
 ];
 
-const TOTAL_CHECKLIST_COUNT = CHECKLIST_SECTIONS.reduce(
-  (acc, sec) => acc + sec.items.length,
-  0
-);
-
 export default function CleaningChecklistPage() {
-  const [properties, setProperties] = useState([]);
-  const [isCustomProperty, setIsCustomProperty] = useState(false);
-
   // Form Fields
   const [formData, setFormData] = useState({
     cleaning_date: new Date().toISOString().slice(0, 10),
@@ -112,7 +101,7 @@ export default function CleaningChecklistPage() {
     video_url: '',
   });
 
-  // Checklist state
+  // Checklist state for standard items
   const [checklist, setChecklist] = useState(() => {
     const initial = {};
     CHECKLIST_SECTIONS.forEach((sec) => {
@@ -124,7 +113,16 @@ export default function CleaningChecklistPage() {
     return initial;
   });
 
-  // Photo uploads state: { file, preview, originalSize, compressedSize, ratio, compressing }
+  // Custom manual checklist items per section (e.g. Bathtube bersih)
+  const [customItems, setCustomItems] = useState(() => {
+    const initial = {};
+    CHECKLIST_SECTIONS.forEach((sec) => {
+      initial[sec.id] = [{ text: '', checked: false }];
+    });
+    return initial;
+  });
+
+  // Photo uploads state
   const [photos, setPhotos] = useState({
     photo_bedroom: null,
     photo_bathroom: null,
@@ -140,29 +138,19 @@ export default function CleaningChecklistPage() {
   const [submittedData, setSubmittedData] = useState(null);
   const [hasCopied, setHasCopied] = useState(false);
 
-  // Fetch properties for fast autocomplete / selection
-  useEffect(() => {
-    const fetchProps = async () => {
-      try {
-        const res = await request.get(API_ENDPOINTS.PROPERTIES.LIST, { limit: 100 });
-        if (res?.data && Array.isArray(res.data)) {
-          setProperties(res.data);
-        }
-      } catch (err) {
-        // Silent fallback
-      }
-    };
-    fetchProps();
-  }, []);
-
-  // Calculate Progress
-  const completedCount = Object.values(checklist).reduce((secAcc, itemsObj) => {
+  // Calculate Progress (Standard items + valid custom manual items)
+  const standardCompleted = Object.values(checklist).reduce((secAcc, itemsObj) => {
     return secAcc + Object.values(itemsObj).filter(Boolean).length;
   }, 0);
 
-  const progressPercent = Math.round((completedCount / TOTAL_CHECKLIST_COUNT) * 100);
+  const validCustomItems = Object.values(customItems).flat().filter((i) => i.text.trim() !== '');
+  const customCompleted = validCustomItems.filter((i) => i.checked).length;
 
-  // Handle single check toggle
+  const totalItemsCount = 27 + validCustomItems.length;
+  const completedCount = standardCompleted + customCompleted;
+  const progressPercent = totalItemsCount > 0 ? Math.round((completedCount / totalItemsCount) * 100) : 0;
+
+  // Handle standard check toggle
   const toggleItem = (sectionId, itemName) => {
     setChecklist((prev) => ({
       ...prev,
@@ -173,20 +161,68 @@ export default function CleaningChecklistPage() {
     }));
   };
 
-  // Section check/uncheck all
+  // Custom items handlers
+  const updateCustomItemText = (sectionId, index, text) => {
+    setCustomItems((prev) => {
+      const list = [...(prev[sectionId] || [])];
+      list[index] = { ...list[index], text };
+      return { ...prev, [sectionId]: list };
+    });
+  };
+
+  const toggleCustomItem = (sectionId, index) => {
+    setCustomItems((prev) => {
+      const list = [...(prev[sectionId] || [])];
+      if (!list[index]) return prev;
+      list[index] = { ...list[index], checked: !list[index].checked };
+      return { ...prev, [sectionId]: list };
+    });
+  };
+
+  const addCustomItem = (sectionId) => {
+    setCustomItems((prev) => ({
+      ...prev,
+      [sectionId]: [...(prev[sectionId] || []), { text: '', checked: false }],
+    }));
+  };
+
+  const removeCustomItem = (sectionId, index) => {
+    setCustomItems((prev) => {
+      const list = [...(prev[sectionId] || [])];
+      list.splice(index, 1);
+      if (list.length === 0) {
+        list.push({ text: '', checked: false });
+      }
+      return { ...prev, [sectionId]: list };
+    });
+  };
+
+  // Section check/uncheck all (both standard + custom items)
   const toggleSectionAll = (sectionId) => {
     const currentSection = checklist[sectionId] || {};
-    const allChecked = Object.values(currentSection).every(Boolean);
-    const updated = {};
+    const standardAllChecked = Object.values(currentSection).every(Boolean);
+
+    const updatedStandard = {};
     const section = CHECKLIST_SECTIONS.find((s) => s.id === sectionId);
     section.items.forEach((item) => {
-      updated[item] = !allChecked;
+      updatedStandard[item] = !standardAllChecked;
     });
 
     setChecklist((prev) => ({
       ...prev,
-      [sectionId]: updated,
+      [sectionId]: updatedStandard,
     }));
+
+    // Also update custom items in this section that have text
+    setCustomItems((prev) => {
+      const list = (prev[sectionId] || []).map((c) => {
+        if (c.text.trim()) {
+          return { ...c, checked: !standardAllChecked };
+        }
+        return c;
+      });
+      return { ...prev, [sectionId]: list };
+    });
   };
 
   // Check all items
@@ -199,7 +235,17 @@ export default function CleaningChecklistPage() {
       });
     });
     setChecklist(updated);
-    toast.success('Semua 27 item berhasil dicentang!');
+
+    // Also check all filled custom items
+    setCustomItems((prev) => {
+      const next = {};
+      Object.keys(prev).forEach((secId) => {
+        next[secId] = prev[secId].map((c) => (c.text.trim() ? { ...c, checked: true } : c));
+      });
+      return next;
+    });
+
+    toast.success('Semua item checklist berhasil dicentang!');
   };
 
   // Handle photo upload with CompressorJS
@@ -207,7 +253,6 @@ export default function CleaningChecklistPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Set compressing indicator
     setPhotos((prev) => ({
       ...prev,
       [fieldKey]: { compressing: true },
@@ -300,7 +345,22 @@ export default function CleaningChecklistPage() {
     setFormData((prev) => ({ ...prev, [field]: `${hours}:${minutes}` }));
   };
 
-  // Copy Formatted Checklist text to Clipboard (for WhatsApp / Telegram sharing)
+  // Prepare full checklist items dictionary (standard + valid custom)
+  const getMergedChecklistItems = () => {
+    const merged = {};
+    CHECKLIST_SECTIONS.forEach((sec) => {
+      merged[sec.id] = { ...checklist[sec.id] };
+      customItems[sec.id]?.forEach((c) => {
+        const clean = c.text.trim();
+        if (clean) {
+          merged[sec.id][clean] = !!c.checked;
+        }
+      });
+    });
+    return merged;
+  };
+
+  // Copy Formatted Checklist text to Clipboard
   const copyChecklistText = () => {
     const dateFormatted = formData.cleaning_date || new Date().toISOString().slice(0, 10);
     let text = `*DAILY AFTER CLEANING REPORT*\n*LUCKYSTAY PROPERTY MANAGEMENT*\n`;
@@ -313,12 +373,18 @@ export default function CleaningChecklistPage() {
     text += `• Status Unit: ${formData.unit_status || 'Siap Huni'}\n`;
     text += `• Waktu: ${formData.start_time || '-'} s/d ${formData.end_time || '-'}\n\n`;
 
-    text += `*B. CHECKLIST AFTER CLEANING (${progressPercent}% - ${completedCount}/${TOTAL_CHECKLIST_COUNT})*\n`;
+    text += `*B. CHECKLIST AFTER CLEANING (${progressPercent}% - ${completedCount}/${totalItemsCount})*\n`;
     CHECKLIST_SECTIONS.forEach((sec) => {
       text += `\n*${sec.title}:*\n`;
       sec.items.forEach((item) => {
         const isDone = checklist[sec.id]?.[item];
         text += `${isDone ? '✅' : '❌'} ${item}\n`;
+      });
+      // Append custom manual items
+      customItems[sec.id]?.forEach((c) => {
+        if (c.text.trim()) {
+          text += `${c.checked ? '✅' : '❌'} ${c.text.trim()} (Manual)\n`;
+        }
       });
     });
 
@@ -353,7 +419,7 @@ export default function CleaningChecklistPage() {
       return;
     }
     if (!formData.property_name.trim()) {
-      toast.error('Mohon pilih atau isi nama apartemen!');
+      toast.error('Mohon ketik nama apartemen!');
       return;
     }
     if (!formData.unit_number.trim()) {
@@ -369,6 +435,7 @@ export default function CleaningChecklistPage() {
     const toastId = toast.loading('Mengirim laporan ceklis...');
 
     try {
+      const mergedItems = getMergedChecklistItems();
       const dataPayload = new FormData();
       dataPayload.append('cleaning_date', formData.cleaning_date);
       dataPayload.append('cleaner_name', formData.cleaner_name.trim());
@@ -380,7 +447,7 @@ export default function CleaningChecklistPage() {
       dataPayload.append('damage_notes', formData.damage_notes.trim());
       dataPayload.append('additional_notes', formData.additional_notes.trim());
       dataPayload.append('confirmed_by', formData.cleaner_name.trim());
-      dataPayload.append('checklist_items', JSON.stringify(checklist));
+      dataPayload.append('checklist_items', JSON.stringify(mergedItems));
       dataPayload.append('video_url', formData.video_url || '');
 
       // Append photo files
@@ -438,14 +505,17 @@ export default function CleaningChecklistPage() {
       confirmed_by: '',
       video_url: '',
     });
-    const initial = {};
+    const initialChecklist = {};
+    const initialCustom = {};
     CHECKLIST_SECTIONS.forEach((sec) => {
-      initial[sec.id] = {};
+      initialChecklist[sec.id] = {};
       sec.items.forEach((item) => {
-        initial[sec.id][item] = false;
+        initialChecklist[sec.id][item] = false;
       });
+      initialCustom[sec.id] = [{ text: '', checked: false }];
     });
-    setChecklist(initial);
+    setChecklist(initialChecklist);
+    setCustomItems(initialCustom);
     setPhotos({
       photo_bedroom: null,
       photo_bathroom: null,
@@ -462,7 +532,7 @@ export default function CleaningChecklistPage() {
     <div className="min-h-screen bg-gray-50 text-gray-800 py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-orange-500 selection:text-white">
       <div className="max-w-3xl mx-auto">
         
-        {/* Top Header Card (Clean White) */}
+        {/* Top Header Card */}
         <div className="relative overflow-hidden rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-8 mb-6 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
             <div>
@@ -486,7 +556,7 @@ export default function CleaningChecklistPage() {
           </div>
         </div>
 
-        {/* Success Modal / Banner (Clean Light Emerald) */}
+        {/* Success Modal / Banner */}
         {submittedData && (
           <div className="mb-8 rounded-3xl bg-white border border-emerald-200 p-6 sm:p-8 shadow-sm text-center">
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm">
@@ -574,56 +644,19 @@ export default function CleaningChecklistPage() {
                 />
               </div>
 
-              {/* Nama Apartemen */}
+              {/* Nama Apartemen (Ketik Manual - Sesuai Revisi) */}
               <div className="sm:col-span-2">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-gray-700">
-                    Nama Apartemen <span className="text-rose-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomProperty(!isCustomProperty);
-                      setFormData((prev) => ({ ...prev, property_name: '' }));
-                    }}
-                    className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold underline cursor-pointer"
-                  >
-                    {isCustomProperty ? 'Pilih dari daftar properti' : 'Ketik manual / Nama baru'}
-                  </button>
-                </div>
-
-                {isCustomProperty || properties.length === 0 ? (
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Grand Asia Afrika Residence"
-                    value={formData.property_name}
-                    onChange={(e) => setFormData({ ...formData, property_name: e.target.value })}
-                    className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-gray-400"
-                  />
-                ) : (
-                  <select
-                    required
-                    value={formData.property_name}
-                    onChange={(e) => {
-                      const selected = e.target.value;
-                      const matched = properties.find((p) => p.name === selected);
-                      setFormData((prev) => ({
-                        ...prev,
-                        property_name: selected,
-                        unit_number: matched?.unit_number || prev.unit_number,
-                      }));
-                    }}
-                    className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors font-medium"
-                  >
-                    <option value="">-- Pilih Apartemen / Properti --</option>
-                    {properties.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name} {p.building_name ? `(${p.building_name})` : ''} - {p.city}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Nama Apartemen <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ketik nama apartemen (Contoh: Grand Asia Afrika Residence)"
+                  value={formData.property_name}
+                  onChange={(e) => setFormData({ ...formData, property_name: e.target.value })}
+                  className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-orange-500 transition-colors placeholder:text-gray-400 font-medium"
+                />
               </div>
 
               {/* Tower / Lantai / Nomor Unit */}
@@ -708,7 +741,7 @@ export default function CleaningChecklistPage() {
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-gray-900">CHECKLIST AFTER CLEANING</h2>
-                  <p className="text-xs text-gray-500">Centang setelah memastikan setiap bagian sudah bersih dan siap digunakan.</p>
+                  <p className="text-xs text-gray-500">Centang item yang bersih, atau ketik item manual tambahan jika ada</p>
                 </div>
               </div>
               <button
@@ -716,7 +749,7 @@ export default function CleaningChecklistPage() {
                 onClick={checkAllItems}
                 className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-bold border border-orange-200 transition-colors cursor-pointer"
               >
-                Centang Semua (27 Item)
+                Centang Semua Item
               </button>
             </div>
 
@@ -725,7 +758,7 @@ export default function CleaningChecklistPage() {
               <div className="flex items-center justify-between text-xs mb-2">
                 <span className="font-semibold text-gray-700">Progress checklist:</span>
                 <span className="font-bold text-emerald-600 text-sm">
-                  {progressPercent}% <span className="text-xs text-gray-500 font-normal">({completedCount} dari {TOTAL_CHECKLIST_COUNT} item selesai)</span>
+                  {progressPercent}% <span className="text-xs text-gray-500 font-normal">({completedCount} dari {totalItemsCount} item selesai)</span>
                 </span>
               </div>
               <div className="w-full h-2.5 rounded-full bg-gray-200 overflow-hidden">
@@ -740,8 +773,13 @@ export default function CleaningChecklistPage() {
             <div className="space-y-6">
               {CHECKLIST_SECTIONS.map((section) => {
                 const sectionItems = checklist[section.id] || {};
-                const sectionCompleted = Object.values(sectionItems).filter(Boolean).length;
-                const isAllDone = sectionCompleted === section.items.length;
+                const standardDone = Object.values(sectionItems).filter(Boolean).length;
+                const sectionCustom = customItems[section.id] || [];
+                const validSectionCustom = sectionCustom.filter((c) => c.text.trim());
+                const customDone = validSectionCustom.filter((c) => c.checked).length;
+                const sectionTotal = section.items.length + validSectionCustom.length;
+                const sectionCompletedTotal = standardDone + customDone;
+                const isAllDone = sectionCompletedTotal === sectionTotal && sectionTotal > 0;
 
                 return (
                   <div key={section.id} className="rounded-2xl bg-gray-50/70 border border-gray-200/70 p-4 sm:p-5">
@@ -751,7 +789,7 @@ export default function CleaningChecklistPage() {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           isAllDone ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
                         }`}>
-                          {sectionCompleted}/{section.items.length}
+                          {sectionCompletedTotal}/{sectionTotal}
                         </span>
                       </div>
                       <button
@@ -764,6 +802,7 @@ export default function CleaningChecklistPage() {
                     </div>
 
                     <div className="space-y-2">
+                      {/* Standard items */}
                       {section.items.map((item) => {
                         const isChecked = !!sectionItems[item];
                         return (
@@ -789,6 +828,64 @@ export default function CleaningChecklistPage() {
                           </label>
                         );
                       })}
+
+                      {/* Manual / Custom Items for this Room */}
+                      {sectionCustom.map((cItem, cIdx) => (
+                        <div
+                          key={cIdx}
+                          className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl transition-all ${
+                            cItem.checked && cItem.text.trim()
+                              ? 'bg-emerald-50/90 border border-emerald-200 text-gray-900 shadow-xs'
+                              : 'bg-white hover:bg-gray-100/50 border border-dashed border-gray-300 hover:border-orange-300'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleCustomItem(section.id, cIdx)}
+                            className="shrink-0 focus:outline-none cursor-pointer"
+                            title="Centang item manual ini"
+                          >
+                            {cItem.checked && cItem.text.trim() ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-gray-300 hover:text-gray-400" />
+                            )}
+                          </button>
+
+                          <input
+                            type="text"
+                            value={cItem.text}
+                            onChange={(e) => updateCustomItemText(section.id, cIdx, e.target.value)}
+                            placeholder="Tulis item manual di ruangan ini (misal: Bathtube bersih)..."
+                            className={`flex-1 bg-transparent text-xs sm:text-sm font-medium focus:outline-none placeholder:text-gray-400 ${
+                              cItem.checked && cItem.text.trim() ? 'line-through text-gray-500' : 'text-gray-800'
+                            }`}
+                          />
+
+                          {sectionCustom.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeCustomItem(section.id, cIdx)}
+                              className="p-1 text-gray-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Hapus baris item manual ini"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Button to add more custom items */}
+                      <div className="pt-1 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => addCustomItem(section.id)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Tambah baris item manual di {section.title}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -913,7 +1010,7 @@ export default function CleaningChecklistPage() {
                 );
               })}
 
-              {/* Video Dokumentasi (File or URL) */}
+              {/* Video Dokumentasi */}
               <div className="relative rounded-2xl bg-gray-50/70 border border-gray-200/80 p-3 flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-800">Video Kondisi Akhir Unit</span>
@@ -1018,7 +1115,7 @@ export default function CleaningChecklistPage() {
             </button>
           </div>
 
-          {/* SOP Guide Box (as shown in user image) */}
+          {/* SOP Guide Box */}
           <div className="rounded-3xl bg-white border border-gray-200/80 p-6 shadow-sm text-xs text-gray-600 space-y-2">
             <div className="flex items-center gap-2 text-gray-900 font-bold mb-2">
               <ShieldCheck className="w-4 h-4 text-orange-500" />

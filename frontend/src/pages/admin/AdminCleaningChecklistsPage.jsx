@@ -688,15 +688,20 @@ export default function AdminCleaningChecklistsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {CHECKLIST_SECTIONS.map((section) => {
                   const sectionData = selectedReport.checklist_items?.[section.id] || {};
+                  const customKeys = Object.keys(sectionData).filter((k) => !section.items.includes(k));
+                  const totalCount = section.items.length + customKeys.length;
+                  const doneCount = Object.values(sectionData).filter(Boolean).length;
+
                   return (
                     <div key={section.id} className="p-3.5 rounded-xl border border-gray-100 bg-white">
                       <div className="font-bold text-xs text-gray-900 mb-2 pb-1.5 border-b border-gray-100 flex items-center justify-between">
                         <span>{section.title}</span>
-                        <span className="text-[10px] text-gray-400">
-                          {Object.values(sectionData).filter(Boolean).length}/{section.items.length}
+                        <span className="text-[10px] text-gray-400 font-semibold">
+                          {doneCount}/{totalCount}
                         </span>
                       </div>
                       <div className="space-y-1.5 text-xs">
+                        {/* Standard items */}
                         {section.items.map((item) => {
                           const isDone = !!sectionData[item];
                           return (
@@ -708,6 +713,26 @@ export default function AdminCleaningChecklistsPage() {
                               )}
                               <span className={isDone ? 'text-gray-700' : 'text-gray-400'}>
                                 {item}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                        {/* Custom Manual items */}
+                        {customKeys.map((customKey) => {
+                          const isDone = !!sectionData[customKey];
+                          return (
+                            <div key={customKey} className="flex items-center gap-2 pt-1 border-t border-dashed border-gray-100">
+                              {isDone ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <Circle className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                              )}
+                              <span className={isDone ? 'text-gray-800 font-medium' : 'text-gray-400'}>
+                                {customKey}{' '}
+                                <span className="text-[10px] text-orange-600 bg-orange-50 border border-orange-200/60 px-1.5 py-0.5 rounded-full font-semibold">
+                                  Manual
+                                </span>
                               </span>
                             </div>
                           );
