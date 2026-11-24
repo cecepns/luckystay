@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import { 
-  ClipboardCheck, 
-  CheckCircle2, 
-  Circle, 
-  Camera, 
-  Video, 
-  AlertTriangle, 
-  Send, 
-  Copy, 
-  Check, 
-  Clock, 
-  Calendar, 
-  User, 
-  Trash2, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  ClipboardCheck,
+  CheckCircle2,
+  Circle,
+  Camera,
+  Video,
+  AlertTriangle,
+  Send,
+  Copy,
+  Check,
+  Clock,
+  Calendar,
+  User,
+  Trash2,
+  Sparkles,
+  ShieldCheck,
   ArrowRight,
   Plus,
   X
@@ -531,7 +531,7 @@ export default function CleaningChecklistPage() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-orange-500 selection:text-white">
       <div className="max-w-3xl mx-auto">
-        
+
         {/* Top Header Card */}
         <div className="relative overflow-hidden rounded-3xl bg-white border border-gray-200/80 p-6 sm:p-8 mb-6 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
@@ -744,13 +744,13 @@ export default function CleaningChecklistPage() {
                   <p className="text-xs text-gray-500">Centang item yang bersih, atau ketik item manual tambahan jika ada</p>
                 </div>
               </div>
-              <button
+              {/* <button
                 type="button"
                 onClick={checkAllItems}
                 className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-bold border border-orange-200 transition-colors cursor-pointer"
               >
                 Centang Semua Item
-              </button>
+              </button> */}
             </div>
 
             {/* Progress Bar Widget */}
@@ -786,9 +786,8 @@ export default function CleaningChecklistPage() {
                     <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200/60">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-900 tracking-wide">{section.title}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isAllDone ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
-                        }`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAllDone ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+                          }`}>
                           {sectionCompletedTotal}/{sectionTotal}
                         </span>
                       </div>
@@ -809,11 +808,10 @@ export default function CleaningChecklistPage() {
                           <label
                             key={item}
                             onClick={() => toggleItem(section.id, item)}
-                            className={`flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer select-none ${
-                              isChecked
+                            className={`flex items-start gap-3 p-3 rounded-xl transition-all cursor-pointer select-none ${isChecked
                                 ? 'bg-emerald-50/90 border border-emerald-200 text-gray-900 shadow-xs'
                                 : 'bg-white hover:bg-gray-100/70 border border-gray-200/80 text-gray-600'
-                            }`}
+                              }`}
                           >
                             <div className="mt-0.5 shrink-0">
                               {isChecked ? (
@@ -833,11 +831,10 @@ export default function CleaningChecklistPage() {
                       {sectionCustom.map((cItem, cIdx) => (
                         <div
                           key={cIdx}
-                          className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl transition-all ${
-                            cItem.checked && cItem.text.trim()
+                          className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl transition-all ${cItem.checked && cItem.text.trim()
                               ? 'bg-emerald-50/90 border border-emerald-200 text-gray-900 shadow-xs'
                               : 'bg-white hover:bg-gray-100/50 border border-dashed border-gray-300 hover:border-orange-300'
-                          }`}
+                            }`}
                         >
                           <button
                             type="button"
@@ -857,9 +854,8 @@ export default function CleaningChecklistPage() {
                             value={cItem.text}
                             onChange={(e) => updateCustomItemText(section.id, cIdx, e.target.value)}
                             placeholder="Tulis item manual di ruangan ini (misal: Bathtube bersih)..."
-                            className={`flex-1 bg-transparent text-xs sm:text-sm font-medium focus:outline-none placeholder:text-gray-400 ${
-                              cItem.checked && cItem.text.trim() ? 'line-through text-gray-500' : 'text-gray-800'
-                            }`}
+                            className={`flex-1 bg-transparent text-xs sm:text-sm font-medium focus:outline-none placeholder:text-gray-400 ${cItem.checked && cItem.text.trim() ? 'line-through text-gray-500' : 'text-gray-800'
+                              }`}
                           />
 
                           {sectionCustom.length > 1 && (
