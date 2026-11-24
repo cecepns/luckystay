@@ -18,7 +18,8 @@ import {
   CreditCard,
   MessageSquareQuote,
   LogOut,
-  UserCheck
+  UserCheck,
+  ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,6 +38,7 @@ export default function AdminLayout({ children }) {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
     { name: 'Kelola Booking & Approval', href: '/admin/bookings', icon: CalendarCheck },
+    { name: 'Ceklis Kebersihan', href: '/admin/cleaning-checklists', icon: ClipboardCheck },
     { name: 'Daftar Properti', href: '/admin/properties', icon: Building },
     { name: 'Kelola Kota / Destinasi', href: '/admin/cities', icon: MapPin },
     { name: 'Tipe Unit', href: '/admin/property-types', icon: Layers },

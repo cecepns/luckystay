@@ -14,6 +14,7 @@ import BookingCheckoutPage from './pages/BookingCheckoutPage';
 import InvoicePage from './pages/InvoicePage';
 import CheckBookingPage from './pages/CheckBookingPage';
 import MyBookingsPage from './pages/MyBookingsPage';
+import CleaningChecklistPage from './pages/CleaningChecklistPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Admin Pages & Guard
@@ -21,6 +22,7 @@ import AdminRoute from './components/AdminRoute';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminBookingsPage from './pages/admin/AdminBookingsPage';
+import AdminCleaningChecklistsPage from './pages/admin/AdminCleaningChecklistsPage';
 import AdminPropertiesPage from './pages/admin/AdminPropertiesPage';
 import AdminCitiesPage from './pages/admin/AdminCitiesPage';
 import AdminPropertyTypesPage from './pages/admin/AdminPropertyTypesPage';
@@ -79,12 +81,17 @@ export default function App() {
           <Route path="/check-booking" element={<CheckBookingPage />} />
           <Route path="/my-bookings" element={<MyBookingsPage />} />
 
+          {/* Public Housekeeping Daily Cleaning Checklist (No Login Required) */}
+          <Route path="/cleaning-checklist" element={<CleaningChecklistPage />} />
+          <Route path="/checklist-kebersihan" element={<CleaningChecklistPage />} />
+
           {/* Admin Login Route (Public within Admin Context) */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
 
           {/* Protected Admin Routes (Guard with AdminRoute) */}
           <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
           <Route path="/admin/bookings" element={<AdminRoute><AdminBookingsPage /></AdminRoute>} />
+          <Route path="/admin/cleaning-checklists" element={<AdminRoute><AdminCleaningChecklistsPage /></AdminRoute>} />
           <Route path="/admin/properties" element={<AdminRoute><AdminPropertiesPage /></AdminRoute>} />
           <Route path="/admin/cities" element={<AdminRoute><AdminCitiesPage /></AdminRoute>} />
           <Route path="/admin/property-types" element={<AdminRoute><AdminPropertyTypesPage /></AdminRoute>} />

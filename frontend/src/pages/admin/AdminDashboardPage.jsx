@@ -14,7 +14,8 @@ import {
   Share2, 
   ArrowRight,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  ClipboardCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,7 +26,9 @@ export default function AdminDashboardPage() {
     confirmed: 0,
     totalRevenue: 0,
     totalProperties: 0,
-    hostexSyncedCount: 0
+    hostexSyncedCount: 0,
+    cleaningToday: 0,
+    cleaningNeedsRepair: 0
   });
 
   const [recentBookings, setRecentBookings] = useState([]);
@@ -35,10 +38,11 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [bookingsRes, propsRes, hostexRes] = await Promise.allSettled([
+      const [bookingsRes, propsRes, hostexRes, cleaningsRes] = await Promise.allSettled([
         request.get(API_ENDPOINTS.BOOKINGS.LIST, { limit: 100 }),
         request.get(API_ENDPOINTS.PROPERTIES.LIST, { limit: 100 }),
-        request.get(API_ENDPOINTS.HOSTEX.STATUS)
+        request.get(API_ENDPOINTS.HOSTEX.STATUS),
+        request.get(API_ENDPOINTS.CLEANING_CHECKLISTS.LIST, { limit: 1 })
       ]);
 
       let allBookings = [];
@@ -56,6 +60,13 @@ export default function AdminDashboardPage() {
         setHostexStatus(hostexRes.value.data);
       }
 
+      let cleaningToday = 0;
+      let cleaningNeedsRepair = 0;
+      if (cleaningsRes.status === 'fulfilled' && cleaningsRes.value.stats) {
+        cleaningToday = cleaningsRes.value.stats.today || 0;
+        cleaningNeedsRepair = cleaningsRes.value.stats.needs_repair || 0;
+      }
+
       // Calculate statistics
       const waiting = allBookings.filter(b => b.payment_status === 'waiting_approval').length;
       const confirmed = allBookings.filter(b => b.payment_status === 'confirmed').length;
@@ -70,7 +81,9 @@ export default function AdminDashboardPage() {
         confirmed,
         totalRevenue: revenue,
         totalProperties: totalProps,
-        hostexSyncedCount: synced
+        hostexSyncedCount: synced,
+        cleaningToday,
+        cleaningNeedsRepair
       });
     } catch (e) {
       console.error(e);
@@ -163,6 +176,47 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* Housekeeping Cleaning Checklist Quick Banner */}
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-orange-500/20 text-orange-400 rounded-lg">
+                <ClipboardCheck className="w-4 h-4" />
+              </span>
+              <h3 className="text-sm font-bold text-white">Laporan Ceklis Kebersihan Harian Housekeeping</h3>
+            </div>
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              {stats.cleaningToday > 0 ? (
+                <span>Hari ini ada <strong>{stats.cleaningToday} laporan cleaning</strong> masuk dari tim housekeeping.</span>
+              ) : (
+                <span>Belum ada laporan cleaning masuk hari ini. Bagikan link publik ke tim housekeeping agar unit langsung terdokumentasi.</span>
+              )}
+              {stats.cleaningNeedsRepair > 0 && (
+                <span className="text-amber-400 font-semibold block mt-0.5">
+                  ⚠️ Perhatian: Terdapat {stats.cleaningNeedsRepair} unit yang memerlukan perbaikan / ada catatan kerusakan!
+                </span>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/admin/cleaning-checklists"
+              className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+            >
+              Buka Laporan Ceklis
+            </Link>
+            <a
+              href="/cleaning-checklist"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition-all"
+            >
+              Form Publik ↗
+            </a>
+          </div>
         </div>
 
         {/* Hostex Integration Banner Guide */}

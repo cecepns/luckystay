@@ -100,6 +100,14 @@ export const API_ENDPOINTS = {
     DELETE: (id) => `/reviews/${id}`,
   },
 
+  CLEANING_CHECKLISTS: {
+    SUBMIT: "/cleaning-checklists",
+    LIST: "/cleaning-checklists",
+    DETAIL: (id) => `/cleaning-checklists/${id}`,
+    UPDATE: (id) => `/cleaning-checklists/${id}`,
+    DELETE: (id) => `/cleaning-checklists/${id}`,
+  },
+
   SYSTEM: {
     HEALTH: "/health",
   },

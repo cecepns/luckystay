@@ -54,15 +54,15 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 30 * 1024 * 1024 }, // 30MB max
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp|gif|svg/;
+    const allowedTypes = /jpeg|jpg|png|webp|gif|svg|mp4|mov|webm|quicktime|octet-stream/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (extname && mimetype) {
+    const mimetype = allowedTypes.test(file.mimetype) || (file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')));
+    if (extname || mimetype) {
       return cb(null, true);
     }
-    cb(new Error('Hanya file gambar (JPG, PNG, WEBP, GIF, SVG) yang diperbolehkan!'));
+    cb(new Error('Hanya file gambar (JPG, PNG, WEBP, GIF, SVG) atau video (MP4, MOV, WEBM) yang diperbolehkan!'));
   }
 });
 
@@ -118,6 +118,48 @@ dbPool.getConnection()
     try {
       await conn.query(`UPDATE bank_accounts SET qris_image = NULL WHERE qris_image = '[object Object]'`);
     } catch (e) {}
+    try {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS \`cleaning_checklists\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`report_code\` VARCHAR(60) NOT NULL UNIQUE,
+          \`cleaning_date\` DATE NOT NULL,
+          \`cleaner_name\` VARCHAR(150) NOT NULL,
+          \`property_name\` VARCHAR(200) NOT NULL,
+          \`unit_number\` VARCHAR(100) NOT NULL,
+          \`unit_status\` VARCHAR(50) NOT NULL DEFAULT 'Siap Huni',
+          \`start_time\` VARCHAR(20) DEFAULT NULL,
+          \`end_time\` VARCHAR(20) DEFAULT NULL,
+          \`checklist_items\` JSON NOT NULL,
+          \`total_items\` INT NOT NULL DEFAULT 27,
+          \`completed_items\` INT NOT NULL DEFAULT 0,
+          \`completion_percent\` INT NOT NULL DEFAULT 0,
+          \`damage_notes\` TEXT DEFAULT NULL,
+          \`additional_notes\` TEXT DEFAULT NULL,
+          \`photo_bedroom\` VARCHAR(255) DEFAULT NULL,
+          \`photo_bathroom\` VARCHAR(255) DEFAULT NULL,
+          \`photo_living_room\` VARCHAR(255) DEFAULT NULL,
+          \`photo_kitchen\` VARCHAR(255) DEFAULT NULL,
+          \`photo_overview\` VARCHAR(255) DEFAULT NULL,
+          \`video_url\` VARCHAR(255) DEFAULT NULL,
+          \`is_confirmed\` TINYINT(1) NOT NULL DEFAULT 1,
+          \`confirmed_by\` VARCHAR(150) DEFAULT NULL,
+          \`admin_notes\` TEXT DEFAULT NULL,
+          \`verified_by\` VARCHAR(150) DEFAULT NULL,
+          \`is_verified\` TINYINT(1) NOT NULL DEFAULT 0,
+          \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX \`idx_cleaning_date\` (\`cleaning_date\`),
+          INDEX \`idx_cleaner_name\` (\`cleaner_name\`),
+          INDEX \`idx_property_name\` (\`property_name\`),
+          INDEX \`idx_unit_status\` (\`unit_status\`),
+          INDEX \`idx_is_verified\` (\`is_verified\`),
+          INDEX \`idx_created_at\` (\`created_at\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+    } catch (e) {
+      console.error('Auto migration cleaning_checklists error:', e.message);
+    }
     conn.release();
   })
   .catch(err => {
@@ -2276,6 +2318,414 @@ app.delete('/api/reviews/:id', async (req, res) => {
   } catch (err) {
     console.error('Delete review error:', err);
     res.status(500).json({ success: false, message: 'Gagal menghapus ulasan: ' + err.message });
+  }
+});
+
+// ----------------------------------------------------
+// DAILY CLEANING CHECKLIST APIS (Housekeeping Reports)
+// ----------------------------------------------------
+
+const cleaningUpload = upload.fields([
+  { name: 'photo_bedroom', maxCount: 1 },
+  { name: 'photo_bathroom', maxCount: 1 },
+  { name: 'photo_living_room', maxCount: 1 },
+  { name: 'photo_kitchen', maxCount: 1 },
+  { name: 'photo_overview', maxCount: 1 },
+  { name: 'video_file', maxCount: 1 }
+]);
+
+// POST /api/cleaning-checklists (PUBLIC - No auth required)
+app.post('/api/cleaning-checklists', (req, res, next) => {
+  cleaningUpload(req, res, (err) => {
+    if (err) {
+      console.error('Upload documentation error:', err);
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Gagal mengupload file bukti foto/video'
+      });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const {
+      cleaning_date,
+      cleaner_name,
+      property_name,
+      unit_number,
+      unit_status,
+      start_time,
+      end_time,
+      checklist_items,
+      damage_notes,
+      additional_notes,
+      confirmed_by,
+      video_url
+    } = req.body;
+
+    if (!cleaning_date || !cleaner_name || !property_name || !unit_number) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mohon lengkapi tanggal cleaning, nama petugas, nama apartemen, dan tower/unit!'
+      });
+    }
+
+    // Parse checklist items
+    let parsedItems = {};
+    if (typeof checklist_items === 'string') {
+      try {
+        parsedItems = JSON.parse(checklist_items);
+      } catch (e) {
+        parsedItems = {};
+      }
+    } else if (typeof checklist_items === 'object' && checklist_items !== null) {
+      parsedItems = checklist_items;
+    }
+
+    // Count completed items
+    let totalItems = 0;
+    let completedItems = 0;
+
+    Object.keys(parsedItems).forEach(cat => {
+      const group = parsedItems[cat];
+      if (typeof group === 'object' && group !== null) {
+        Object.keys(group).forEach(itemKey => {
+          totalItems++;
+          if (group[itemKey] === true || group[itemKey] === 'true' || group[itemKey] === 1) {
+            completedItems++;
+          }
+        });
+      }
+    });
+
+    if (totalItems === 0) {
+      totalItems = 27; // Default total
+    }
+
+    const completionPercent = Math.round((completedItems / totalItems) * 100);
+
+    // Extract uploaded files
+    const files = req.files || {};
+    const photo_bedroom = files.photo_bedroom?.[0] ? `/uploads-luckystay/${files.photo_bedroom[0].filename}` : (req.body.photo_bedroom || null);
+    const photo_bathroom = files.photo_bathroom?.[0] ? `/uploads-luckystay/${files.photo_bathroom[0].filename}` : (req.body.photo_bathroom || null);
+    const photo_living_room = files.photo_living_room?.[0] ? `/uploads-luckystay/${files.photo_living_room[0].filename}` : (req.body.photo_living_room || null);
+    const photo_kitchen = files.photo_kitchen?.[0] ? `/uploads-luckystay/${files.photo_kitchen[0].filename}` : (req.body.photo_kitchen || null);
+    const photo_overview = files.photo_overview?.[0] ? `/uploads-luckystay/${files.photo_overview[0].filename}` : (req.body.photo_overview || null);
+
+    // Video can be uploaded file or link
+    let finalVideoUrl = video_url || null;
+    if (files.video_file?.[0]) {
+      finalVideoUrl = `/uploads-luckystay/${files.video_file[0].filename}`;
+    }
+
+    // Generate unique report code (e.g. CHK-20261124-7X2A)
+    const dateStr = (cleaning_date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const report_code = `CHK-${dateStr}-${randomSuffix}`;
+
+    const [result] = await dbPool.query(
+      `INSERT INTO cleaning_checklists (
+        report_code,
+        cleaning_date,
+        cleaner_name,
+        property_name,
+        unit_number,
+        unit_status,
+        start_time,
+        end_time,
+        checklist_items,
+        total_items,
+        completed_items,
+        completion_percent,
+        damage_notes,
+        additional_notes,
+        photo_bedroom,
+        photo_bathroom,
+        photo_living_room,
+        photo_kitchen,
+        photo_overview,
+        video_url,
+        is_confirmed,
+        confirmed_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      [
+        report_code,
+        cleaning_date,
+        cleaner_name.trim(),
+        property_name.trim(),
+        unit_number.trim(),
+        unit_status || 'Siap Huni',
+        start_time || null,
+        end_time || null,
+        JSON.stringify(parsedItems),
+        totalItems,
+        completedItems,
+        completionPercent,
+        damage_notes ? damage_notes.trim() : null,
+        additional_notes ? additional_notes.trim() : null,
+        photo_bedroom,
+        photo_bathroom,
+        photo_living_room,
+        photo_kitchen,
+        photo_overview,
+        finalVideoUrl,
+        confirmed_by ? confirmed_by.trim() : cleaner_name.trim()
+      ]
+    );
+
+    const [createdRows] = await dbPool.query('SELECT * FROM cleaning_checklists WHERE id = ?', [result.insertId]);
+    const reportData = createdRows[0];
+    if (typeof reportData.checklist_items === 'string') {
+      try {
+        reportData.checklist_items = JSON.parse(reportData.checklist_items);
+      } catch (e) {}
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Laporan ceklis kebersihan harian berhasil dikirim!',
+      data: reportData
+    });
+  } catch (err) {
+    console.error('Submit cleaning checklist error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal menyimpan laporan ceklis: ' + err.message
+    });
+  }
+});
+
+// GET /api/cleaning-checklists (Admin list with pagination, search, filters)
+app.get('/api/cleaning-checklists', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
+
+    const search = (req.query.search || '').trim();
+    const status = (req.query.unit_status || req.query.status || '').trim();
+    const startDate = (req.query.start_date || '').trim();
+    const endDate = (req.query.end_date || '').trim();
+    const isVerified = req.query.is_verified;
+
+    let whereConditions = ['1=1'];
+    let queryParams = [];
+
+    if (search) {
+      whereConditions.push('(report_code LIKE ? OR cleaner_name LIKE ? OR property_name LIKE ? OR unit_number LIKE ? OR damage_notes LIKE ? OR additional_notes LIKE ?)');
+      const pattern = `%${search}%`;
+      queryParams.push(pattern, pattern, pattern, pattern, pattern, pattern);
+    }
+
+    if (status && status !== 'all') {
+      whereConditions.push('unit_status = ?');
+      queryParams.push(status);
+    }
+
+    if (startDate) {
+      whereConditions.push('cleaning_date >= ?');
+      queryParams.push(startDate);
+    }
+
+    if (endDate) {
+      whereConditions.push('cleaning_date <= ?');
+      queryParams.push(endDate);
+    }
+
+    if (isVerified !== undefined && isVerified !== '' && isVerified !== 'all') {
+      whereConditions.push('is_verified = ?');
+      queryParams.push(isVerified === '1' || isVerified === 1 || isVerified === 'true' ? 1 : 0);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Total count
+    const [[{ total }]] = await dbPool.query(
+      `SELECT COUNT(*) as total FROM cleaning_checklists WHERE ${whereClause}`,
+      queryParams
+    );
+
+    // Fetch items
+    const [rows] = await dbPool.query(
+      `SELECT * FROM cleaning_checklists WHERE ${whereClause} ORDER BY cleaning_date DESC, created_at DESC LIMIT ? OFFSET ?`,
+      [...queryParams, limit, offset]
+    );
+
+    // Format checklist_items JSON
+    const formattedRows = rows.map(item => ({
+      ...item,
+      checklist_items: typeof item.checklist_items === 'string' 
+        ? (() => { try { return JSON.parse(item.checklist_items); } catch(e) { return {}; } })()
+        : (item.checklist_items || {})
+    }));
+
+    // Calculate quick stats
+    const [[stats]] = await dbPool.query(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN cleaning_date = CURDATE() THEN 1 ELSE 0 END) as today_total,
+        SUM(CASE WHEN unit_status = 'Siap Huni' THEN 1 ELSE 0 END) as ready_total,
+        SUM(CASE WHEN unit_status = 'Perlu Perbaikan' OR (damage_notes IS NOT NULL AND damage_notes != '') THEN 1 ELSE 0 END) as damage_total
+      FROM cleaning_checklists
+    `);
+
+    res.json({
+      success: true,
+      data: formattedRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+      },
+      stats: {
+        total: Number(stats?.total) || 0,
+        today: Number(stats?.today_total) || 0,
+        ready: Number(stats?.ready_total) || 0,
+        needs_repair: Number(stats?.damage_total) || 0
+      }
+    });
+  } catch (err) {
+    console.error('Fetch cleaning checklists error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal mengambil data laporan ceklis: ' + err.message
+    });
+  }
+});
+
+// GET /api/cleaning-checklists/:id (Single report detail)
+app.get('/api/cleaning-checklists/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isCode = isNaN(id);
+    const sql = isCode 
+      ? 'SELECT * FROM cleaning_checklists WHERE report_code = ?'
+      : 'SELECT * FROM cleaning_checklists WHERE id = ?';
+    
+    const [rows] = await dbPool.query(sql, [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Laporan ceklis tidak ditemukan' });
+    }
+
+    const report = rows[0];
+    if (typeof report.checklist_items === 'string') {
+      try {
+        report.checklist_items = JSON.parse(report.checklist_items);
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (err) {
+    console.error('Fetch cleaning checklist detail error:', err);
+    res.status(500).json({ success: false, message: 'Gagal mengambil detail laporan: ' + err.message });
+  }
+});
+
+// PUT /api/cleaning-checklists/:id (Admin update report / verification)
+app.put('/api/cleaning-checklists/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      unit_status,
+      damage_notes,
+      additional_notes,
+      admin_notes,
+      verified_by,
+      is_verified
+    } = req.body;
+
+    let updateFields = [];
+    let params = [];
+
+    if (unit_status !== undefined) {
+      updateFields.push('unit_status = ?');
+      params.push(unit_status);
+    }
+    if (damage_notes !== undefined) {
+      updateFields.push('damage_notes = ?');
+      params.push(damage_notes);
+    }
+    if (additional_notes !== undefined) {
+      updateFields.push('additional_notes = ?');
+      params.push(additional_notes);
+    }
+    if (admin_notes !== undefined) {
+      updateFields.push('admin_notes = ?');
+      params.push(admin_notes);
+    }
+    if (verified_by !== undefined) {
+      updateFields.push('verified_by = ?');
+      params.push(verified_by);
+    }
+    if (is_verified !== undefined) {
+      const val = is_verified === 1 || is_verified === '1' || is_verified === true || is_verified === 'true' ? 1 : 0;
+      updateFields.push('is_verified = ?');
+      params.push(val);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, message: 'Tidak ada perubahan data yang dikirim.' });
+    }
+
+    params.push(id);
+    await dbPool.query(`UPDATE cleaning_checklists SET ${updateFields.join(', ')} WHERE id = ?`, params);
+
+    const [updatedRows] = await dbPool.query('SELECT * FROM cleaning_checklists WHERE id = ?', [id]);
+    const updated = updatedRows[0];
+    if (typeof updated?.checklist_items === 'string') {
+      try {
+        updated.checklist_items = JSON.parse(updated.checklist_items);
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      message: 'Laporan ceklis berhasil diperbarui',
+      data: updated
+    });
+  } catch (err) {
+    console.error('Update cleaning checklist error:', err);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui laporan: ' + err.message });
+  }
+});
+
+// DELETE /api/cleaning-checklists/:id (Admin delete report)
+app.delete('/api/cleaning-checklists/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await dbPool.query('SELECT * FROM cleaning_checklists WHERE id = ?', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Laporan ceklis tidak ditemukan' });
+    }
+
+    const item = rows[0];
+    const photosToDelete = [
+      item.photo_bedroom,
+      item.photo_bathroom,
+      item.photo_living_room,
+      item.photo_kitchen,
+      item.photo_overview,
+      item.video_url
+    ];
+
+    photosToDelete.forEach(filePath => {
+      if (filePath && filePath.startsWith('/uploads-luckystay/')) {
+        const fullLocalPath = path.join(__dirname, filePath.replace('/uploads-luckystay/', 'uploads-luckystay/'));
+        if (fs.existsSync(fullLocalPath)) {
+          try { fs.unlinkSync(fullLocalPath); } catch (e) {}
+        }
+      }
+    });
+
+    await dbPool.query('DELETE FROM cleaning_checklists WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Laporan ceklis kebersihan berhasil dihapus' });
+  } catch (err) {
+    console.error('Delete cleaning checklist error:', err);
+    res.status(500).json({ success: false, message: 'Gagal menghapus laporan: ' + err.message });
   }
 });
 
